@@ -53,6 +53,31 @@ function toolsFromEntry(entry) {
   return content.filter((c) => c?.type === 'tool_use');
 }
 
+// Türkçe ve İngilizce soru kalıpları — "tur bitti" ile "sana soru soruldu" farkı bu.
+const ASK_PATTERNS = /\b(mı|mi|mu|mü|musun|misin|mısın|müsün|hangisi|hangisini|ister misin|onaylıyor|onaylar mısın|ne yapayım|devam edeyim|edelim mi|should i|shall i|which one|do you want|confirm)\b/i;
+
+function summarizeTurn(text, ts) {
+  // kod bloklarını, tablo satırlarını ve dosya yollarını at; anlamlı son cümleyi bul
+  const clean = text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/^\s*[|>#\-*].*$/gm, ' ')
+    .replace(/https?:\/\/\S+/g, ' ')
+    .replace(/\S*\/\S*\.\w+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const sentences = clean.split(/(?<=[.!?…])\s+/).filter((s) => s.trim().length > 12);
+  const tail = sentences.slice(-2).join(' ').trim() || clean.slice(-160);
+  const lastSentence = sentences[sentences.length - 1] || clean;
+
+  return {
+    text: tail.length > 180 ? '…' + tail.slice(-179) : tail,
+    isQuestion: /\?\s*$/.test(lastSentence.trim()) || ASK_PATTERNS.test(lastSentence),
+    ts,
+  };
+}
+
 function statusFor(lastTs, awaitingInput) {
   const age = Date.now() - lastTs;
   if (awaitingInput) return 'waiting';
@@ -100,8 +125,8 @@ async function scanSession(file) {
       const content = entry?.message?.content;
       const tools = toolsFromEntry(entry);
       if (tools.length === 0 && Array.isArray(content)) {
-        const text = content.filter((c) => c?.type === 'text').map((c) => c.text).join(' ').trim();
-        if (text) lastQuestion = { text: text.slice(-400), ts };
+        const text = content.filter((c) => c?.type === 'text').map((c) => c.text).join('\n').trim();
+        if (text) lastQuestion = summarizeTurn(text, ts);
       } else {
         lastQuestion = null;
       }

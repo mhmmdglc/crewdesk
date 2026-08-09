@@ -140,8 +140,11 @@ export class Office {
       return at(28 + index * 26, 108);
     }
     if (room === 'lounge') {
-      // TV'nin karşısındaki koltuk
-      return at(74 + index * 24, 112);
+      // koltuk önü + mutfak tarafı: kalabalık olunca iki sıraya dağılır
+      const perRow = 4;
+      const col = index % perRow;
+      const row = Math.floor(index / perRow);
+      return at(26 + col * 44, 92 + row * 54);
     }
     if (room === 'handoff') {
       // paketleme masasının önünde ayakta
@@ -302,57 +305,78 @@ export class Office {
     const H = rect.h / PX;
 
     if (room === 'pm') {
-      // yönetici odası: duvarda kitaplık + saat + tablo, ortada toplantı masası
-      s('bookshelf2', 8, 4);
-      s('clock', 78, 0);
-      s('painting', 150, 2);
-      s('bigTable', 92, 106);
-      s('woodChairBack', 100, 92);
-      s('woodChairBack', 124, 92);
-      s('woodChairFront', 100, 168);
-      s('woodChairFront', 124, 168);
-      s('bookshelf', 8, 40);
-      s('largePlant', W - 42, H - 54);
-      s('pot', 8, H - 22);
+      // yönetici odası: duvar boyunca kitaplık, ortada toplantı masası, köşede oturma grubu
+      s('bookshelf2', 6, 2);
+      s('bookshelf', 44, 6);
+      s('clock', 86, 0);
+      s('painting', 146, 2);
+      s('bigTable', 74, 92);
+      s('woodChairBack', 82, 78);
+      s('woodChairBack', 108, 78);
+      s('woodChairFront', 82, 154);
+      s('woodChairFront', 108, 154);
+      s('sofaSide', 176, 92);
+      s('smallTable', 168, 130);
+      s('coffee', 178, 126);
+      s('largePlant', 8, H - 56);
+      s('pot', 44, H - 20);
+      s('bin', W - 22, H - 20);
     } else if (room === 'work') {
-      // açık ofis: duvarda plan tahtası, köşede çöp + bitki, kahve köşesi
-      s('whiteboard', 8, -2);
-      s('smallPainting2', 150, 0);
-      s('smallTable', W - 44, H - 40);
-      s('coffee', W - 36, H - 46);
-      s('bin', W - 22, H - 20);
-      s('largePlant', 8, H - 54);
-      s('plant2', W - 66, H - 34);
+      // açık ofis: duvarda plan tahtası, karşılıklı masa sıraları, kahve köşesi
+      s('whiteboard', 6, -2);
+      s('smallPainting2', 106, 0);
+      s('smallPainting', 140, 0);
+      s('bookshelf', 168, 6);
+      s('smallTable', W - 40, 96);
+      s('coffee', W - 32, 92);
+      s('largePlant', W - 44, H - 58);
+      s('plant2', 8, H - 40);
+      s('pot', 40, H - 20);
+      s('bin', W - 20, H - 20);
     } else if (room === 'test') {
-      // test laboratuvarı: cihaz tezgâhı (yan yana PC'ler) + kontrol listesi tahtası
-      s('whiteboard', W - 44, -2);
+      // test laboratuvarı: cihaz tezgâhı üstünde terminaller, kontrol listesi tahtası
+      s('whiteboard', W - 42, -2);
       s('clock', 8, 0);
-      s('bigTable', 96, 104);
-      s('pcBack', 100, 88);
-      s('pcBack', 118, 88);
-      s('pcBack', 136, 88);
-      s('cactus', 10, H - 38);
+      s('bookshelf', 100, 6);
+      s('bigTable', 84, 118);
+      s('pcBack', 88, 96);
+      s('pcBack', 106, 96);
+      s('pcBack', 124, 96);
+      s('woodChairFront', 92, 180);
+      s('woodChairFront', 120, 180);
+      s('deskSide', 8, 96);
+      s('pcSide', 12, 78);
+      s('cactus', W - 26, H - 40);
       s('bin', W - 22, H - 20);
-      s('pot', W - 44, H - 22);
+      s('pot', 46, H - 20);
     } else if (room === 'handoff') {
-      // teslim/sevkiyat: raflar, paketleme masası, yerde istiflenmiş kutular
-      s('bookshelf2', 10, 4);
-      s('bookshelf2', 46, 4);
-      s('smallTable', 104, 84);
-      box(108, 74, 12, 9);
-      box(122, 76, 10, 8);
-      s('smallPainting', W - 26, 2);
-      for (let i = 0; i < 4; i++) box(14 + i * 15, H - 30, 12, 9);
-      for (let i = 0; i < 3; i++) box(18 + i * 15, H - 40, 12, 9);
-      s('plant', W - 24, H - 34);
-      s('bin', W - 48, H - 20);
+      // sevkiyat: iki duvar boyunca raf, ortada paketleme tezgâhı, yerde palet ve kutular
+      s('bookshelf2', 6, 2);
+      s('bookshelf2', 40, 2);
+      s('bookshelf2', 74, 2);
+      s('bigTable', 96, 96);
+      box(102, 80, 13, 10);
+      box(118, 82, 11, 9);
+      box(132, 78, 12, 10);
+      s('smallPainting', W - 24, 2);
+      s('deskSide', W - 22, 60);
+      // palet üstünde istif
+      this.p(rect.x + 12 * PX, rect.y + (H - 34) * PX, 74 * PX, 6 * PX, '#7a5c3a');
+      for (let i = 0; i < 5; i++) box(14 + i * 15, H - 44, 13, 10);
+      for (let i = 0; i < 4; i++) box(18 + i * 15, H - 54, 13, 10);
+      for (let i = 0; i < 2; i++) box(26 + i * 15, H - 64, 13, 10);
+      s('plant', W - 26, H - 36);
+      s('bin', W - 50, H - 20);
     } else if (room === 'waiting') {
-      // bekleme salonu: bank sırası, sehpa, sıra numarası ekranı, su sebili
-      for (let i = 0; i < 5; i++) s('bench', 26 + i * 26, 122);
-      s('coffeeTable', W - 62, 96);
-      s('coffee', W - 54, 92);
+      // bekleme salonu: solda bank sırası, sağda sehpa köşesi, sıra ekranı, su sebili
+      for (let i = 0; i < 4; i++) s('bench', 26 + i * 24, 120);
+      s('coffeeTable', W - 52, 118);
+      s('coffee', W - 42, 114);
+      s('chairFront', W - 58, 156);
+      s('chairFront', W - 30, 156);
       s('clock', W - 22, 0);
-      s('hangingPlant', 14, 0);
+      s('hangingPlant', 8, 0);
+      s('smallPainting2', 140, 2);
       // sıra numarası ekranı
       this.p(rect.x + 82 * PX, rect.y + 6 * PX, 34 * PX, 14 * PX, '#241a14');
       this.p(rect.x + 84 * PX, rect.y + 8 * PX, 30 * PX, 10 * PX, '#3a2418');
@@ -367,11 +391,13 @@ export class Office {
     } else if (room === 'lounge') {
       // dinlenme: duvarda TV, karşısında koltuk takımı, sehpa, mutfak köşesi
       this.drawTv(rect.x + (W / 2 - 22) * PX, rect.y + 0 * PX);
-      s('sofa', W / 2 - 16, 128);
-      s('sofaSide', W / 2 - 34, 108);
-      s('sofaSide', W / 2 + 18, 108);
-      s('coffeeTable', W / 2 - 16, 148);
-      s('coffee', W / 2 - 6, 144);
+      s('sofaBack', W / 2 - 16, 74);
+      s('sofaSide', W / 2 - 38, 96);
+      s('sofaSide', W / 2 + 22, 96);
+      s('coffeeTable', W / 2 - 16, 100);
+      s('coffee', W / 2 - 6, 96);
+      s('sofa', W / 2 - 16, 146);
+      s('smallPainting2', 30, 2);
       // mutfak tezgâhı
       this.p(rect.x + 8 * PX, rect.y + (H - 34) * PX, 46 * PX, 18 * PX, '#6b4c30');
       this.p(rect.x + 8 * PX, rect.y + (H - 36) * PX, 46 * PX, 4 * PX, '#8a6440');

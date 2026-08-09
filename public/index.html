@@ -102,6 +102,10 @@
   .alert .txt { color: #d6d2e2; font-size: 10.5px; margin-top: 4px; line-height: 1.4;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .alert.more { text-align: center; color: #fdba74; font-size: 11px; padding: 6px; }
+  .alert.quiet { background: var(--panel); border-color: var(--line); border-left-color: var(--dim);
+    color: var(--dim); font-size: 11px; text-align: center; padding: 6px; cursor: default; }
+  .alert .x { color: #fdba74; padding: 0 3px; cursor: pointer; }
+  .alert .x:hover { color: #fff; }
   @keyframes pop { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
   .proj .q { color: #fb923c; }
 </style>
@@ -181,6 +185,10 @@ function meter(label, value, pct) {
   </div>`;
 }
 
+// "Sana soru soruldu" ile "tur bitti, sırada sen varsın" ayrı şeyler — ikisi de aynı ölçüte bağlı
+const realQuestions = (p) => (p.questions || []).filter((q) => q.isQuestion && q.fresh);
+const idleTurns = (p) => (p.questions || []).length - realQuestions(p).length;
+
 function renderProjects() {
   document.getElementById('projects').innerHTML = state.projects.map((p) => {
     const status = p.activeCount ? 'active' : p.waitingCount ? 'waiting' : 'idle';
@@ -194,7 +202,8 @@ function renderProjects() {
       <div class="badges" style="margin-top:6px">
         ${open ? `<span class="badge">${open} açık iş</span>` : '<span class="badge">iş yok</span>'}
         ${p.activeCount ? `<span class="badge" style="color:var(--active)">${p.activeCount} çalışıyor</span>` : ''}
-        ${(p.questions || []).length ? `<span class="badge q">💬 ${p.questions.length} soru</span>` : ''}
+        ${realQuestions(p).length ? `<span class="badge q">❓ ${realQuestions(p).length} soru</span>` : ''}
+        ${idleTurns(p) ? `<span class="badge">${idleTurns(p)} tur bitti</span>` : ''}
       </div>
     </button>`;
   }).join('');
@@ -289,30 +298,47 @@ function render() {
 
 const notified = new Set();
 
+const dismissed = new Set();
+
 function renderAlerts() {
-  const questions = state.projects.flatMap((p) => p.questions || []);
+  const all = state.projects.flatMap((p) => p.questions || []);
+  // Yalnızca gerçek soru + taze sohbet uyarı olur. Turu bitmiş olanlar sessiz sayaçta durur.
+  const asks = all.filter((q) => q.isQuestion && q.fresh && !dismissed.has(q.sessionId));
+  const idleTurns = all.filter((q) => !asks.includes(q)).length;
   const box = document.getElementById('alerts');
 
-  const shown = questions.slice(0, 3);
-  const rest = questions.length - shown.length;
+  const shown = asks.slice(0, 3);
+  const rest = asks.length - shown.length;
 
   box.innerHTML = shown.map((q) => `
-    <div class="alert" data-project="${q.project}">
-      <div class="who"><span>💬 ${q.projectName}</span><span>${ago(q.since)} önce</span></div>
-      <div class="txt">${q.text.replace(/[<>&]/g, ' ').trim().slice(-110)}</div>
+    <div class="alert" data-project="${q.project}" data-session="${q.sessionId}">
+      <div class="who">
+        <span>❓ ${q.projectName}</span>
+        <span>${ago(q.since)} önce <b class="x" title="kapat">×</b></span>
+      </div>
+      <div class="txt">${q.text.replace(/[<>&]/g, ' ').trim()}</div>
     </div>`).join('')
-    + (rest > 0 ? `<div class="alert more">+${rest} sohbet daha yanıt bekliyor</div>` : '');
+    + (rest > 0 ? `<div class="alert more">+${rest} soru daha</div>` : '')
+    + (idleTurns > 0 ? `<div class="alert quiet">${idleTurns} sohbet turunu bitirmiş, sırada sen varsın</div>` : '');
 
-  box.querySelectorAll('.alert').forEach((el) => {
-    el.onclick = () => { selected = el.dataset.project; render(); };
+  box.querySelectorAll('.alert[data-project]').forEach((el) => {
+    el.onclick = (event) => {
+      if (event.target.classList.contains('x')) {
+        dismissed.add(el.dataset.session);
+        renderAlerts();
+        return;
+      }
+      selected = el.dataset.project;
+      render();
+    };
   });
 
-  for (const q of questions) {
+  for (const q of asks) {
     const key = `${q.sessionId}:${q.since}`;
     if (notified.has(key)) continue;
     notified.add(key);
     if (window.Notification?.permission === 'granted') {
-      new Notification(`${q.projectName} — Claude soru sordu`, { body: q.text.slice(-140) });
+      new Notification(`${q.projectName} — sana soru soruldu`, { body: q.text.slice(0, 140) });
     }
   }
 }

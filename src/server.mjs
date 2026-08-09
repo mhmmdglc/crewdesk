@@ -40,6 +40,9 @@ async function buildState() {
           projectName: project.name,
           title: s.title || s.sessionId.slice(0, 8),
           text: s.question.text,
+          isQuestion: Boolean(s.question.isQuestion),
+          // uyarı yalnızca taze sohbetler için; eskiyen sohbet seni beklemiyor, sadece durmuş
+          fresh: Date.now() - s.lastActivity < 2 * 60 * 60 * 1000,
           since: s.lastActivity,
         })),
       sessions: project.sessions.map((s) => ({

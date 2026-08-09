@@ -111,14 +111,15 @@ export function deriveCrew({ roster, tasks, events, sessions = [] }) {
 
     // Oda gözleme dayanır: yalnızca gerçekten koşan ajan çalışma/test odasındadır.
     // Kuyruğu olup koşmayan masasında sırada bekler; boşta olan dinlenmeye geçer.
+    // Çalışma/test odasına YALNIZCA gerçekten koşan ajan girer. Kuyruğu olup
+    // koşmayan biri çalışmıyordur — dinlenme odasında bekler, yükü rozetinde görünür.
     let room;
     let idleAtDesk = false;
     if (waiting) room = 'waiting';
     else if (recentHandoff) room = 'handoff';
     else if (active) room = isQaRole(agent.name) ? 'test' : 'work';
     else if (isPmRole(agent.name)) room = 'pm';
-    else if (queue.length > 0) { room = isQaRole(agent.name) ? 'test' : 'work'; idleAtDesk = true; }
-    else room = 'lounge';
+    else { room = 'lounge'; idleAtDesk = queue.length > 0; }
 
     const current = queue.find((t) => t.status === 'in_progress') || queue[0] || null;
 
