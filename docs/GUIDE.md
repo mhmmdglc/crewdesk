@@ -18,10 +18,13 @@ Everything the [README](../README.md) leaves out. Nothing here is required to us
 ## Running it
 
 ```bash
-npx crewdesk                 # http://127.0.0.1:4600
-npx crewdesk --port 4700     # somewhere else
-npx crewdesk demo            # fabricated data, your own is never read
+npx github:mhmmdglc/crewdesk                 # http://127.0.0.1:4600
+npx github:mhmmdglc/crewdesk --port 4700     # somewhere else
+npx github:mhmmdglc/crewdesk demo            # fabricated data, your own is never read
 ```
+
+crewdesk is installed straight from the repository — there is no npm package to
+publish or trust, and `npx` caches the clone so later runs are instant.
 
 | Flag | Default | Meaning |
 |---|---|---|
@@ -32,7 +35,7 @@ npx crewdesk demo            # fabricated data, your own is never read
 Global install if you would rather have the command around:
 
 ```bash
-npm install --global crewdesk
+npm install --global github:mhmmdglc/crewdesk
 crewdesk
 ```
 

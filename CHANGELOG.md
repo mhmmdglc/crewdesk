@@ -17,6 +17,11 @@ First public release.
 - **Handoff log** — an append-only `~/.crewdesk/events.jsonl` from which queues, rooms and test rounds are derived rather than stored.
 - **HTTP API** — `/api/state`, `/api/events`, `/api/stage`, `/api/assign`, `/api/health`.
 
+### Install
+
+Distributed from the repository rather than the npm registry:
+`npx github:mhmmdglc/crewdesk`.
+
 ### Notes
 
 - Read-only against `~/.claude`; the only files crewdesk writes are under `~/.crewdesk/`.

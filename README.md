@@ -20,10 +20,10 @@ No account, no API key, nothing leaves your machine.
 
 ## Install
 
-Node.js 20+ and [Claude Code](https://claude.com/claude-code).
+Node.js 20+, git, and [Claude Code](https://claude.com/claude-code).
 
 ```bash
-npx crewdesk
+npx github:mhmmdglc/crewdesk
 ```
 
 Open **http://127.0.0.1:4600**. No config, no setup.
@@ -31,7 +31,7 @@ Open **http://127.0.0.1:4600**. No config, no setup.
 Just want to look around first?
 
 ```bash
-npx crewdesk demo
+npx github:mhmmdglc/crewdesk demo
 ```
 
 That serves invented projects from a throwaway directory and never reads your real data. Every image here is that demo.

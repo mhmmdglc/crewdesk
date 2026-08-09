@@ -36,7 +36,7 @@ Sunucuyu yeniden başlatmadan `src/` değişikliği etkili olmaz; `public/` içi
 
 ## Bilinen açık maddeler
 
-- **npm'e yayınlanmadı.** README `npx crewdesk` diyor ama paket kayıtta yok. Engel: hesapta 2FA kapalı, token'da "Bypass 2FA" yok → `npm publish` 403 veriyor. Çözüm: npmjs.com'da 2FA aç, sonra `npm publish` (OTP sorar).
+- **npm'e yayınlanmadı, bilinçli.** Dağıtım doğrudan GitHub'dan: `npx github:mhmmdglc/crewdesk`. Test edildi, demo ve gerçek mod ikisi de çalışıyor. İleride npm istenirse `npm publish` için hesapta 2FA + OTP (ya da bypass'lı granular token) gerekiyor.
 - **Otomatik test yok.** Bulgular elle doğrulandı. `test/` altına fixture tabanlı birkaç senaryo en değerli katkı olur.
 - QA raporundan bilinçli kapatılmayanlar: 5 saatlik pencere gerçekte ~4.x saati kapsıyor (GUIDE'da yazılı), token dosyası senkron okunuyor, `/api/assign` iki ayrı yazım yapıyor (atomik değil), aynı atamayı tekrarlamak kütüğe kopya satır ekliyor.
 - Yalnızca macOS'ta denendi.
