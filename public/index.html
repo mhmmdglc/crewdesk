@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>agent-board</title>
+<style>
+  :root {
+    --bg: #14131a; --panel: #1c1b24; --panel-2: #23222d; --line: #302e3c;
+    --text: #e8e6f0; --dim: #9d99b0; --accent: #8b7dfa;
+    --active: #4ade80; --waiting: #fbbf24; --idle: #64748b; --danger: #f87171;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-size: 13px; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+
+  header {
+    display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+    padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .brand { font-weight: 700; color: var(--accent); letter-spacing: .5px; }
+  .meters { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }
+  .meter { min-width: 190px; }
+  .meter .label { color: var(--dim); font-size: 11px; display: flex; justify-content: space-between; gap: 10px; }
+  .bar { height: 6px; background: var(--panel-2); border-radius: 3px; margin-top: 4px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--accent); }
+  .pill { padding: 2px 8px; border-radius: 10px; background: var(--panel-2); color: var(--dim); font-size: 11px; }
+
+  main { display: grid; grid-template-columns: 260px 1fr; min-height: calc(100vh - 49px); }
+  aside { border-right: 1px solid var(--line); background: var(--panel); padding: 10px; }
+  aside h2 { font-size: 11px; text-transform: uppercase; color: var(--dim); margin: 8px 6px; letter-spacing: 1px; }
+  .proj {
+    display: block; width: 100%; text-align: left; background: none; border: 1px solid transparent;
+    border-radius: 8px; padding: 9px 10px; margin-bottom: 4px;
+  }
+  .proj:hover { background: var(--panel-2); }
+  .proj.sel { background: var(--panel-2); border-color: var(--accent); }
+  .proj .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .proj .name { font-weight: 600; }
+  .proj .path { color: var(--dim); font-size: 11px; margin-top: 2px; word-break: break-all; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot.active { background: var(--active); box-shadow: 0 0 6px var(--active); }
+  .dot.waiting { background: var(--waiting); }
+  .dot.idle, .dot.dormant { background: var(--idle); }
+
+  section { padding: 14px 16px; overflow: auto; }
+  .sessions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .sess {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 9px 11px; min-width: 240px; max-width: 340px;
+  }
+  .sess .row { display: flex; align-items: center; gap: 7px; }
+  .sess .title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sess .tool { color: var(--accent); font-size: 11px; margin-top: 4px; word-break: break-all; }
+  .sess .meta { color: var(--dim); font-size: 11px; margin-top: 3px; }
+  .sub { margin-top: 6px; padding-left: 9px; border-left: 2px solid var(--line); color: var(--dim); font-size: 11px; }
+
+  .cols { display: grid; grid-template-columns: repeat(4, minmax(200px, 1fr)); gap: 12px; }
+  .col { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  .col h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); display: flex; justify-content: space-between; }
+  .card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 9px; margin-bottom: 8px; }
+  .card .subject { line-height: 1.4; }
+  .card .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; align-items: center; }
+  .badge { font-size: 10px; padding: 2px 6px; border-radius: 8px; background: #2f2d3b; color: var(--dim); }
+  .badge.rounds { background: #3a2530; color: var(--danger); }
+  .badge.owner { background: #262a3d; color: #93b4f8; }
+  .move { display: flex; gap: 4px; margin-top: 8px; }
+  .move button { flex: 1; background: #2b2937; border: 1px solid var(--line); border-radius: 6px; padding: 3px 0; font-size: 10px; color: var(--dim); }
+  .move button:hover { border-color: var(--accent); color: var(--text); }
+  .move button.on { background: var(--accent); color: #14131a; border-color: var(--accent); font-weight: 700; }
+  .empty { color: var(--dim); font-size: 11px; padding: 6px 2px; }
+  footer { color: var(--dim); font-size: 11px; padding: 8px 16px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">agent-board</div>
+  <div class="meters" id="meters"></div>
+  <div style="margin-left:auto" class="pill" id="clock"></div>
+</header>
+
+<main>
+  <aside>
+    <h2>Projeler</h2>
+    <div id="projects"></div>
+  </aside>
+  <section>
+    <div class="sessions" id="sessions"></div>
+    <div class="cols" id="cols"></div>
+  </section>
+</main>
+<footer id="footer"></footer>
+
+<script>
+const STAGE_LABEL = { manager: 'Manager', dev: 'Geliştirme', test: 'Test', done: 'Bitti' };
+let selected = null;
+let state = null;
+
+const fmt = (n) => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'K' : String(n);
+const ago = (ts) => {
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (s < 60) return s + 'sn';
+  if (s < 3600) return Math.round(s / 60) + 'dk';
+  return Math.round(s / 3600) + 'sa';
+};
+
+function meters(tokens) {
+  if (!tokens.available) return '<span class="pill">token verisi yok</span>';
+  const gauges = tokens.gauges.map((g) => {
+    const pct = Math.min(100, Math.round((g.used / g.limit) * 100));
+    return meter(g.label || 'limit', pct + '%', pct);
+  }).join('');
+  const reset = new Date(tokens.windowResetsAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  return `
+    ${meter('5 saatlik pencere', fmt(tokens.fiveHour) + ' token', null)}
+    ${meter('7 günlük pencere', fmt(tokens.sevenDay) + ' token', null)}
+    ${gauges}
+    <span class="pill">kova yenilenme ${reset}</span>`;
+}
+
+function meter(label, value, pct) {
+  return `<div class="meter">
+    <div class="label"><span>${label}</span><b>${value}</b></div>
+    ${pct === null ? '' : `<div class="bar"><i style="width:${pct}%"></i></div>`}
+  </div>`;
+}
+
+function renderProjects() {
+  document.getElementById('projects').innerHTML = state.projects.map((p) => {
+    const status = p.activeCount ? 'active' : p.waitingCount ? 'waiting' : 'idle';
+    const open = p.tasks.filter((t) => t.stage !== 'done').length;
+    return `<button class="proj ${p.id === selected ? 'sel' : ''}" data-id="${p.id}">
+      <div class="top">
+        <span class="name"><span class="dot ${status}"></span> ${p.name}</span>
+        <span class="pill">${p.sessions.length} oturum</span>
+      </div>
+      <div class="path">${p.path}</div>
+      <div class="badges" style="margin-top:6px">
+        ${open ? `<span class="badge">${open} açık iş</span>` : '<span class="badge">iş yok</span>'}
+        ${p.activeCount ? `<span class="badge" style="color:var(--active)">${p.activeCount} çalışıyor</span>` : ''}
+      </div>
+    </button>`;
+  }).join('');
+
+  document.querySelectorAll('.proj').forEach((el) => {
+    el.onclick = () => { selected = el.dataset.id; render(); };
+  });
+}
+
+function renderSessions(project) {
+  document.getElementById('sessions').innerHTML = project.sessions.map((s) => `
+    <div class="sess">
+      <div class="row"><span class="dot ${s.status}"></span>
+        <span class="title">${s.title || s.sessionId.slice(0, 8)}</span></div>
+      ${s.lastTool ? `<div class="tool">▸ ${s.lastTool}</div>` : ''}
+      <div class="meta">${s.gitBranch || '—'} · ${ago(s.lastActivity)} önce · ${fmt(s.tokensFiveHour)} tok/5sa</div>
+      ${s.subagents.map((a) => `<div class="sub">└ ${a.name}${a.lastTool ? ' · ' + a.lastTool : ''}</div>`).join('')}
+    </div>`).join('') || '<div class="empty">Bu projede son 7 günde oturum yok.</div>';
+}
+
+function renderColumns(project) {
+  document.getElementById('cols').innerHTML = state.stages.map((stage) => {
+    const cards = project.tasks.filter((t) => t.stage === stage);
+    return `<div class="col">
+      <h3><span>${STAGE_LABEL[stage]}</span><span>${cards.length}</span></h3>
+      ${cards.map((t) => `
+        <div class="card">
+          <div class="subject">${t.subject}</div>
+          <div class="badges">
+            ${t.owner ? `<span class="badge owner">${t.owner}</span>` : ''}
+            ${t.testRounds ? `<span class="badge rounds">${t.testRounds}. test turu</span>` : ''}
+            <span class="badge">#${t.id}</span>
+          </div>
+          <div class="move">
+            ${state.stages.map((s) => `<button data-key="${t.key}" data-stage="${s}"
+              class="${s === t.stage ? 'on' : ''}">${STAGE_LABEL[s]}</button>`).join('')}
+          </div>
+        </div>`).join('') || '<div class="empty">boş</div>'}
+    </div>`;
+  }).join('');
+
+  document.querySelectorAll('.move button').forEach((el) => {
+    el.onclick = async () => {
+      await fetch('/api/stage', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ key: el.dataset.key, stage: el.dataset.stage }),
+      });
+      await load();
+    };
+  });
+}
+
+function render() {
+  if (!state) return;
+  document.getElementById('meters').innerHTML = meters(state.tokens);
+  document.getElementById('clock').textContent = new Date(state.generatedAt).toLocaleTimeString('tr-TR');
+  if (!selected || !state.projects.some((p) => p.id === selected)) selected = state.projects[0]?.id || null;
+  renderProjects();
+  const project = state.projects.find((p) => p.id === selected);
+  if (!project) return;
+  renderSessions(project);
+  renderColumns(project);
+  const totalActive = state.projects.reduce((n, p) => n + p.activeCount, 0);
+  document.getElementById('footer').textContent =
+    `${state.projects.length} proje · ${totalActive} ajan çalışıyor · veri kaynağı ~/.claude (salt okunur)`;
+}
+
+async function load() {
+  const res = await fetch('/api/state');
+  state = await res.json();
+  render();
+}
+
+load();
+setInterval(load, 4000);
+</script>
+</body>
+</html>

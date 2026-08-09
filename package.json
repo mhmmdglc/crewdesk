@@ -1,0 +1,33 @@
+{
+  "name": "agent-board",
+  "version": "0.1.0",
+  "description": "Local dashboard for Claude Code: every project, every agent, what stage the work is in, and how much of your token window is left.",
+  "type": "module",
+  "bin": {
+    "agent-board": "./bin/agent-board.mjs"
+  },
+  "main": "./src/server.mjs",
+  "files": [
+    "bin/",
+    "src/",
+    "public/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node bin/agent-board.mjs",
+    "dev": "node bin/agent-board.mjs --port 4600"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "claude-code",
+    "agents",
+    "dashboard",
+    "observability",
+    "kanban",
+    "token-usage"
+  ],
+  "license": "MIT"
+}
