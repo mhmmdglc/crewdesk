@@ -3,21 +3,47 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scanProjects, readTasks, readTokenWindows, readAgentRoster } from './sources.mjs';
-import { decorate, setStage, setOwner, STAGES } from './board.mjs';
-import { readEvents, appendEvent, deriveCrew, ROOMS, ROOM_LABEL } from './events.mjs';
+import { decorate, setStage, setOwner, assertKey, ValidationError, STAGES } from './board.mjs';
+import { readEvents, appendEvent, deriveCrew, ROOMS, ROOM_LABEL, EVENTS } from './events.mjs';
 
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
+const MAX_BODY = 256 * 1024;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
+  '.png': 'image/png',
   '.svg': 'image/svg+xml',
 };
+
+// Yalnızca kendi sayfamızdan gelen isteklere izin ver: crewdesk kimlik doğrulaması
+// olmayan lokal bir sunucu, dolayısıyla herhangi bir web sayfası ona POST atabilirdi.
+function sameOrigin(req, host) {
+  const site = req.headers['sec-fetch-site'];
+  if (site && site !== 'same-origin' && site !== 'none') return false;
+  const origin = req.headers.origin;
+  if (!origin) return true;                       // curl / fetch-without-origin
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
+// DNS-rebinding koruması: Host başlığı bizim dinlediğimiz adres olmalı
+function hostAllowed(req, address, port) {
+  const host = (req.headers.host || '').toLowerCase();
+  if (!host) return false;
+  const [name] = host.split(':');
+  const allowed = new Set(['127.0.0.1', 'localhost', '[::1]', '::1', address]);
+  return allowed.has(name);
+}
 
 async function buildState() {
   const projects = await scanProjects();
   const tokens = readTokenWindows();
+  const events = await readEvents();
 
   const enriched = [];
   for (const project of projects) {
@@ -25,13 +51,14 @@ async function buildState() {
     for (const session of project.sessions) {
       tasks.push(...(await readTasks(session.sessionId)));
     }
+
     const decorated = await decorate(tasks);
     const roster = await readAgentRoster(project.path);
-    const events = (await readEvents()).filter((e) => !e.project || e.project === project.id);
+    const projectEvents = events.filter((e) => !e.project || e.project === project.id);
 
     enriched.push({
       ...project,
-      crew: deriveCrew({ roster, tasks: decorated, events, sessions: project.sessions }),
+      crew: deriveCrew({ roster, tasks: decorated, events: projectEvents, sessions: project.sessions }),
       questions: project.sessions
         .filter((s) => s.waitingForUser && s.question)
         .map((s) => ({
@@ -41,7 +68,6 @@ async function buildState() {
           title: s.title || s.sessionId.slice(0, 8),
           text: s.question.text,
           isQuestion: Boolean(s.question.isQuestion),
-          // uyarı yalnızca taze sohbetler için; eskiyen sohbet seni beklemiyor, sadece durmuş
           fresh: Date.now() - s.lastActivity < 2 * 60 * 60 * 1000,
           since: s.lastActivity,
         })),
@@ -68,29 +94,50 @@ async function buildState() {
 }
 
 function json(res, code, body) {
-  const payload = JSON.stringify(body);
   res.writeHead(code, {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
+    'x-content-type-options': 'nosniff',
   });
-  res.end(payload);
+  res.end(JSON.stringify(body));
 }
 
 async function readBody(req) {
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
-  if (chunks.length === 0) return {};
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
-  } catch {
-    return {};
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > MAX_BODY) {
+      req.destroy();
+      throw new ValidationError('body too large');
+    }
+    chunks.push(chunk);
   }
+  if (chunks.length === 0) return {};
+  let parsed;
+  try {
+    parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  } catch {
+    throw new ValidationError('body must be valid JSON');
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new ValidationError('body must be a JSON object');
+  }
+  return parsed;
+}
+
+function optionalString(value, field, max = 200) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || value.length > max) {
+    throw new ValidationError(`${field} must be a string of at most ${max} characters`);
+  }
+  return value;
 }
 
 async function serveStatic(res, urlPath) {
   const rel = urlPath === '/' ? 'index.html' : urlPath.replace(/^\/+/, '');
-  const file = path.join(PUBLIC_DIR, rel);
-  if (!file.startsWith(PUBLIC_DIR)) {
+  const file = path.resolve(PUBLIC_DIR, rel);
+  if (file !== PUBLIC_DIR && !file.startsWith(PUBLIC_DIR + path.sep)) {
     res.writeHead(403).end('forbidden');
     return;
   }
@@ -99,6 +146,11 @@ async function serveStatic(res, urlPath) {
     res.writeHead(200, {
       'content-type': MIME[path.extname(file)] || 'application/octet-stream',
       'cache-control': 'no-store',
+      'x-content-type-options': 'nosniff',
+      // sayfa yalnızca kendi kaynaklarını yükleyebilsin; inline script yok
+      'content-security-policy':
+        "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        + "img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     });
     res.end(data);
   } catch {
@@ -106,36 +158,17 @@ async function serveStatic(res, urlPath) {
   }
 }
 
-export function createServer() {
+export function createServer({ address = '127.0.0.1', port = 4600 } = {}) {
   return http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
 
     try {
+      if (!hostAllowed(req, address, port)) {
+        return json(res, 403, { error: 'host not allowed' });
+      }
+
       if (req.method === 'GET' && url.pathname === '/api/state') {
         return json(res, 200, await buildState());
-      }
-
-      if (req.method === 'POST' && url.pathname === '/api/stage') {
-        const body = await readBody(req);
-        if (!body.key || !body.stage) return json(res, 400, { error: 'key ve stage zorunlu' });
-        const entry = await setStage(body.key, body.stage, body.owner);
-        return json(res, 200, { ok: true, entry });
-      }
-
-      // İşi bir ajana ata: hem sahibi yaz, hem devir teslim kütüğüne düş
-      if (req.method === 'POST' && url.pathname === '/api/assign') {
-        const body = await readBody(req);
-        if (!body.key) return json(res, 400, { error: 'key zorunlu' });
-        await setOwner(body.key, body.agent || null);
-        const record = await appendEvent({
-          taskKey: body.key,
-          taskId: body.taskId ?? null,
-          project: body.project ?? null,
-          from: body.from ?? null,
-          to: body.agent || null,
-          event: body.event || 'assigned',
-        });
-        return json(res, 200, { ok: true, record });
       }
 
       if (req.method === 'GET' && url.pathname === '/api/events') {
@@ -146,17 +179,59 @@ export function createServer() {
         return json(res, 200, { ok: true });
       }
 
+      if (req.method === 'POST') {
+        if (!sameOrigin(req, req.headers.host)) {
+          return json(res, 403, { error: 'cross-origin request refused' });
+        }
+        const type = (req.headers['content-type'] || '').split(';')[0].trim();
+        if (type !== 'application/json') {
+          return json(res, 415, { error: 'content-type must be application/json' });
+        }
+
+        if (url.pathname === '/api/stage') {
+          const body = await readBody(req);
+          assertKey(body.key);
+          const owner = body.owner === undefined ? undefined : optionalString(body.owner, 'owner', 120);
+          const entry = await setStage(body.key, body.stage, owner);
+          return json(res, 200, { ok: true, entry });
+        }
+
+        if (url.pathname === '/api/assign') {
+          const body = await readBody(req);
+          assertKey(body.key);
+          const agent = optionalString(body.agent, 'agent', 120);
+          const event = body.event === undefined ? 'assigned' : String(body.event);
+          if (!EVENTS.includes(event)) {
+            throw new ValidationError(`unknown event: ${event}`);
+          }
+          // önce kütük, sonra sahiplik: ikisi de doğrulandıktan sonra yazılır
+          const record = await appendEvent({
+            taskKey: body.key,
+            taskId: optionalString(body.taskId, 'taskId', 32),
+            project: optionalString(body.project, 'project', 256),
+            from: optionalString(body.from, 'from', 120),
+            to: agent,
+            event,
+          });
+          await setOwner(body.key, agent);
+          return json(res, 200, { ok: true, record });
+        }
+
+        return json(res, 404, { error: 'unknown endpoint' });
+      }
+
       if (req.method === 'GET') return await serveStatic(res, url.pathname);
 
       res.writeHead(405).end('method not allowed');
     } catch (error) {
-      json(res, 500, { error: error.message });
+      if (error instanceof ValidationError) return json(res, 400, { error: error.message });
+      json(res, 500, { error: 'internal error' });
     }
   });
 }
 
 export function start({ port = 4600, host = '127.0.0.1' } = {}) {
-  const server = createServer();
+  const server = createServer({ address: host, port });
   return new Promise((resolve) => {
     server.listen(port, host, () => resolve({ server, url: `http://${host}:${server.address().port}` }));
   });

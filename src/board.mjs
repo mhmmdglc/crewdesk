@@ -2,10 +2,24 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 
-export const DATA_DIR = path.join(os.homedir(), '.agent-board');
+export const DATA_DIR = path.join(os.homedir(), '.crewdesk');
 const OVERLAY_FILE = path.join(DATA_DIR, 'overlay.json');
 
 export const STAGES = ['manager', 'dev', 'test', 'done'];
+
+// Anahtar biçimi sabit: "<sessionId>:<taskId>". Serbest anahtar kabul etmek
+// __proto__ gibi değerlerin prototip zincirine yazılmasına yol açıyordu.
+const KEY_PATTERN = /^[A-Za-z0-9._-]{1,128}:[A-Za-z0-9._-]{1,32}$/;
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+export class ValidationError extends Error {}
+
+export function assertKey(key) {
+  if (typeof key !== 'string' || !KEY_PATTERN.test(key) || FORBIDDEN_KEYS.has(key)) {
+    throw new ValidationError('key must look like "<sessionId>:<taskId>"');
+  }
+  return key;
+}
 
 export function defaultStage(task) {
   if (task.status === 'completed') return 'done';
@@ -14,21 +28,67 @@ export function defaultStage(task) {
 }
 
 let cache = null;
+let cacheMtime = 0;
+let loading = null;
+let writeChain = Promise.resolve();
 
-export async function readOverlay() {
-  if (cache) return cache;
+async function loadFromDisk() {
   try {
-    cache = JSON.parse(await fsp.readFile(OVERLAY_FILE, 'utf8'));
+    const [raw, stat] = await Promise.all([
+      fsp.readFile(OVERLAY_FILE, 'utf8'),
+      fsp.stat(OVERLAY_FILE),
+    ]);
+    const parsed = JSON.parse(raw);
+    // prototipsiz nesne: miras alınan alan yok
+    const clean = Object.create(null);
+    for (const [key, value] of Object.entries(parsed)) {
+      if (FORBIDDEN_KEYS.has(key)) continue;
+      clean[key] = value;
+    }
+    cacheMtime = stat.mtimeMs;
+    return clean;
   } catch {
-    cache = {};
+    cacheMtime = 0;
+    return Object.create(null);
   }
-  return cache;
 }
 
-async function writeOverlay(data) {
-  cache = data;
-  await fsp.mkdir(DATA_DIR, { recursive: true });
-  await fsp.writeFile(OVERLAY_FILE, JSON.stringify(data, null, 2));
+export async function readOverlay() {
+  // Disk dışarıdan değiştiyse (ikinci örnek, elle düzenleme) yeniden oku
+  if (cache) {
+    const stat = await fsp.stat(OVERLAY_FILE).catch(() => null);
+    const mtime = stat?.mtimeMs || 0;
+    if (mtime === cacheMtime) return cache;
+    cache = null;
+  }
+  // tek uçuş: eşzamanlı çağrılar aynı yüklemeyi paylaşır, ayrı ayrı {} üretmez
+  if (!loading) {
+    loading = loadFromDisk().then((data) => {
+      cache = data;
+      loading = null;
+      return data;
+    });
+  }
+  return loading;
+}
+
+// Yazımlar sıraya girer ve her biri diski yeniden okuyup üstüne yazar:
+// böylece iki örnek birbirinin kaydını ezmez.
+function enqueue(mutate) {
+  const next = writeChain.then(async () => {
+    const current = await readOverlay();
+    const result = mutate(current);
+    await fsp.mkdir(DATA_DIR, { recursive: true });
+    const tmp = `${OVERLAY_FILE}.${process.pid}.tmp`;
+    await fsp.writeFile(tmp, JSON.stringify(current, null, 2));
+    await fsp.rename(tmp, OVERLAY_FILE);           // atomik değiştirme
+    const stat = await fsp.stat(OVERLAY_FILE).catch(() => null);
+    cacheMtime = stat?.mtimeMs || 0;
+    cache = current;
+    return result;
+  });
+  writeChain = next.catch(() => {});
+  return next;
 }
 
 export function taskKey(sessionId, taskId) {
@@ -39,7 +99,7 @@ export async function decorate(tasks) {
   const overlay = await readOverlay();
   return tasks.map((task) => {
     const key = taskKey(task.sessionId, task.id);
-    const entry = overlay[key] || {};
+    const entry = Object.prototype.hasOwnProperty.call(overlay, key) ? overlay[key] : {};
     return {
       ...task,
       key,
@@ -52,30 +112,42 @@ export async function decorate(tasks) {
   });
 }
 
+function entryFor(overlay, key) {
+  if (!Object.prototype.hasOwnProperty.call(overlay, key)) {
+    overlay[key] = { testRounds: 0, history: [] };
+  }
+  return overlay[key];
+}
+
 export async function setOwner(key, owner) {
-  const overlay = await readOverlay();
-  const entry = overlay[key] || { testRounds: 0, history: [] };
-  entry.owner = owner || null;
-  overlay[key] = entry;
-  await writeOverlay(overlay);
-  return entry;
+  assertKey(key);
+  return enqueue((overlay) => {
+    const entry = entryFor(overlay, key);
+    entry.owner = owner || null;
+    return entry;
+  });
 }
 
 export async function setStage(key, stage, owner) {
-  if (!STAGES.includes(stage)) throw new Error(`unknown stage: ${stage}`);
-  const overlay = await readOverlay();
-  const entry = overlay[key] || { testRounds: 0, history: [] };
-  const previous = entry.stage;
+  assertKey(key);
+  if (!STAGES.includes(stage)) throw new ValidationError(`unknown stage: ${stage}`);
 
-  // Testten geriye dönüş = yeni bir test turu
-  if (previous === 'test' && (stage === 'dev' || stage === 'manager')) {
-    entry.testRounds = (entry.testRounds || 0) + 1;
-  }
+  return enqueue((overlay) => {
+    const entry = entryFor(overlay, key);
+    const previous = entry.stage;
 
-  entry.stage = stage;
-  if (owner !== undefined) entry.owner = owner || null;
-  entry.history = [...(entry.history || []), { stage, at: Date.now() }].slice(-40);
-  overlay[key] = entry;
-  await writeOverlay(overlay);
-  return entry;
+    if (previous === stage && (owner === undefined || entry.owner === (owner || null))) {
+      return entry;   // aynı durum → no-op, geçmişe kayıt düşme
+    }
+
+    // Testten geriye dönüş = yeni bir test turu
+    if (previous === 'test' && (stage === 'dev' || stage === 'manager')) {
+      entry.testRounds = (entry.testRounds || 0) + 1;
+    }
+
+    entry.stage = stage;
+    if (owner !== undefined) entry.owner = owner || null;
+    entry.history = [...(entry.history || []), { stage, at: Date.now() }].slice(-40);
+    return entry;
+  });
 }

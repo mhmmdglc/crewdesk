@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>agent-board</title>
+<title>crewdesk</title>
 <style>
   :root {
     --bg: #14131a; --panel: #1c1b24; --panel-2: #23222d; --line: #302e3c;
@@ -28,6 +28,11 @@
   .bar > i { display: block; height: 100%; background: var(--accent); }
   .pill { padding: 2px 8px; border-radius: 10px; background: var(--panel-2); color: var(--dim); font-size: 11px; }
 
+  .tabs { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .tabs button { background: var(--panel-2); border: 0; padding: 5px 14px; color: var(--dim); font-size: 12px; }
+  .tabs button.on { background: var(--accent); color: #14131a; font-weight: 700; }
+  .tabs button:not(.on):hover { color: var(--text); }
+
   main { display: grid; grid-template-columns: 260px 1fr; min-height: calc(100vh - 49px); }
   aside { border-right: 1px solid var(--line); background: var(--panel); padding: 10px; }
   aside h2 { font-size: 11px; text-transform: uppercase; color: var(--dim); margin: 8px 6px; letter-spacing: 1px; }
@@ -40,8 +45,9 @@
   .proj .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .proj .name { font-weight: 600; }
   .proj .path { color: var(--dim); font-size: 11px; margin-top: 2px; word-break: break-all; }
+  .proj .q { color: #fb923c; }
   .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-  .dot.active { background: var(--active); box-shadow: 0 0 6px var(--active); }
+  .dot.active, .dot.running { background: var(--active); box-shadow: 0 0 6px var(--active); }
   .dot.waiting { background: var(--waiting); }
   .dot.idle, .dot.dormant { background: var(--idle); }
 
@@ -59,34 +65,33 @@
 
   .cols { display: grid; grid-template-columns: repeat(4, minmax(200px, 1fr)); gap: 12px; }
   .col { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
-  .col h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); display: flex; justify-content: space-between; }
+  .col h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--dim); display: flex; justify-content: space-between; }
   .card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 9px; margin-bottom: 8px; }
   .card .subject { line-height: 1.4; }
   .card .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; align-items: center; }
   .badge { font-size: 10px; padding: 2px 6px; border-radius: 8px; background: #2f2d3b; color: var(--dim); }
   .badge.rounds { background: #3a2530; color: var(--danger); }
   .badge.owner { background: #262a3d; color: #93b4f8; }
+  .badge.q { color: #fb923c; }
   .move { display: flex; gap: 4px; margin-top: 8px; }
-  .move button { flex: 1; background: #2b2937; border: 1px solid var(--line); border-radius: 6px; padding: 3px 0; font-size: 10px; color: var(--dim); }
+  .move button { flex: 1; background: #2b2937; border: 1px solid var(--line); border-radius: 6px;
+    padding: 3px 0; font-size: 10px; color: var(--dim); }
   .move button:hover { border-color: var(--accent); color: var(--text); }
   .move button.on { background: var(--accent); color: #14131a; border-color: var(--accent); font-weight: 700; }
-  .empty { color: var(--dim); font-size: 11px; padding: 6px 2px; }
-  footer { color: var(--dim); font-size: 11px; padding: 8px 16px; }
-
-  .tabs { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-  .tabs button { background: var(--panel-2); border: 0; padding: 5px 14px; color: var(--dim); font-size: 12px; }
-  .tabs button.on { background: var(--accent); color: #14131a; font-weight: 700; }
-  .tabs button:not(.on):hover { color: var(--text); }
-  #officeView canvas {
-    width: 100%; height: auto; display: block; border: 1px solid var(--line);
-    border-radius: 10px; image-rendering: pixelated; background: var(--bg);
-  }
-  .hint { color: var(--dim); font-size: 11px; margin-top: 8px; }
   select.assign {
     width: 100%; margin-top: 7px; background: #2b2937; color: var(--text);
     border: 1px solid var(--line); border-radius: 6px; padding: 3px 5px; font-size: 11px;
   }
   select.assign:hover { border-color: var(--accent); }
+  .empty { color: var(--dim); font-size: 11px; padding: 6px 2px; }
+  footer { color: var(--dim); font-size: 11px; padding: 8px 16px; }
+
+  #officeView canvas {
+    width: 100%; height: auto; display: block; border: 1px solid var(--line);
+    border-radius: 10px; image-rendering: pixelated; background: var(--bg);
+  }
+  .hint { color: var(--dim); font-size: 11px; margin-top: 8px; line-height: 1.6; }
 
   #alerts { position: fixed; right: 14px; bottom: 14px; z-index: 50; display: flex;
     flex-direction: column; gap: 6px; width: 290px; }
@@ -94,7 +99,7 @@
     background: linear-gradient(180deg, #2a1d16, #241a14);
     border: 1px solid #7c2d12; border-left: 4px solid #fb923c;
     border-radius: 10px; padding: 10px 12px; cursor: pointer;
-    box-shadow: 0 8px 24px rgba(0,0,0,.45); animation: pop .18s ease-out;
+    box-shadow: 0 8px 24px rgba(0,0,0,.45);
   }
   .alert:hover { border-color: #fb923c; }
   .alert .who { color: #fdba74; font-weight: 700; font-size: 12px; display: flex;
@@ -122,13 +127,11 @@
     box-shadow: 0 6px 18px rgba(0,0,0,.4);
   }
   .bell:hover { border-color: #fb923c; color: #fff; }
-  @keyframes pop { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
-  .proj .q { color: #fb923c; }
 </style>
 </head>
 <body>
 <header>
-  <div class="brand">agent-board</div>
+  <div class="brand">crewdesk</div>
   <div class="tabs">
     <button id="tabBoard" class="on">Tahta</button>
     <button id="tabOffice">Ofis</button>
@@ -152,10 +155,10 @@
       <div class="hint">
         Her karakter bir <b>ajandır</b>, odalar o an ne yaptığını gösterir.
         Başının üstündeki etiket elindeki iş, omzundaki mor sayı kuyruğundaki iş adedi,
-        altındaki renk çizgisi rolünün rengi. Kuyruğu biten dinlenme odasına geçer;
-        senin onayını bekleyen bekleme odasına düşer; biten iş teslim odasına bırakılır ve
-        PM oradan alıp yeniden dağıtır. ↺ kaçıncı test turu olduğunu söyler.
-        Atamayı Tahta sekmesindeki kartlardan yaparsın.
+        altındaki renk çizgisi rolünün rengi. Çalışma ve test odasına yalnızca gerçekten
+        koşan ajan girer; kuyruğu olup çalışmayan dinlenme odasında bekler.
+        Senin onayını bekleyen bekleme odasına düşer, biten iş teslim odasına bırakılır.
+        ↺ kaçıncı test turu olduğunu söyler. Atamayı Tahta sekmesindeki kartlardan yaparsın.
       </div>
     </div>
   </section>
@@ -163,287 +166,6 @@
 <footer id="footer"></footer>
 <div id="alerts"></div>
 
-<script type="module">
-import { Office } from './office.js';
-
-const STAGE_LABEL = { manager: 'Manager', dev: 'Geliştirme', test: 'Test', done: 'Bitti' };
-let selected = null;
-let state = null;
-let view = 'board';
-const office = new Office(document.getElementById('officeCanvas'));
-
-const fmt = (n) => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'K' : String(n);
-const ago = (ts) => {
-  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
-  if (s < 60) return s + 'sn';
-  if (s < 3600) return Math.round(s / 60) + 'dk';
-  return Math.round(s / 3600) + 'sa';
-};
-
-function meters(tokens) {
-  if (!tokens.available) return '<span class="pill">token verisi yok</span>';
-  const gauges = tokens.gauges.map((g) => {
-    const pct = Math.min(100, Math.round((g.used / g.limit) * 100));
-    return meter(g.label || 'limit', pct + '%', pct);
-  }).join('');
-  const reset = new Date(tokens.windowResetsAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-  return `
-    ${meter('5 saatlik pencere', fmt(tokens.fiveHour) + ' token', null)}
-    ${meter('7 günlük pencere', fmt(tokens.sevenDay) + ' token', null)}
-    ${gauges}
-    <span class="pill">kova yenilenme ${reset}</span>`;
-}
-
-function meter(label, value, pct) {
-  return `<div class="meter">
-    <div class="label"><span>${label}</span><b>${value}</b></div>
-    ${pct === null ? '' : `<div class="bar"><i style="width:${pct}%"></i></div>`}
-  </div>`;
-}
-
-// "Sana soru soruldu" ile "tur bitti, sırada sen varsın" ayrı şeyler — ikisi de aynı ölçüte bağlı
-const realQuestions = (p) => (p.questions || []).filter((q) => q.isQuestion && q.fresh);
-const idleTurns = (p) => (p.questions || []).length - realQuestions(p).length;
-
-function renderProjects() {
-  document.getElementById('projects').innerHTML = state.projects.map((p) => {
-    const status = p.activeCount ? 'active' : p.waitingCount ? 'waiting' : 'idle';
-    const open = p.tasks.filter((t) => t.stage !== 'done').length;
-    return `<button class="proj ${p.id === selected ? 'sel' : ''}" data-id="${p.id}">
-      <div class="top">
-        <span class="name"><span class="dot ${status}"></span> ${p.name}</span>
-        <span class="pill">${p.sessions.length} oturum</span>
-      </div>
-      <div class="path">${p.path}</div>
-      <div class="badges" style="margin-top:6px">
-        ${open ? `<span class="badge">${open} açık iş</span>` : '<span class="badge">iş yok</span>'}
-        ${p.activeCount ? `<span class="badge" style="color:var(--active)">${p.activeCount} çalışıyor</span>` : ''}
-        ${realQuestions(p).length ? `<span class="badge q">❓ ${realQuestions(p).length} soru</span>` : ''}
-        ${idleTurns(p) ? `<span class="badge">${idleTurns(p)} tur bitti</span>` : ''}
-      </div>
-    </button>`;
-  }).join('');
-
-  document.querySelectorAll('.proj').forEach((el) => {
-    el.onclick = () => { selected = el.dataset.id; render(); };
-  });
-}
-
-function renderSessions(project) {
-  document.getElementById('sessions').innerHTML = project.sessions.map((s) => `
-    <div class="sess">
-      <div class="row"><span class="dot ${s.status}"></span>
-        <span class="title">${s.title || s.sessionId.slice(0, 8)}</span></div>
-      ${s.lastTool ? `<div class="tool">▸ ${s.lastTool}</div>` : ''}
-      <div class="meta">${s.gitBranch || '—'} · ${ago(s.lastActivity)} önce · ${fmt(s.tokensFiveHour)} tok/5sa</div>
-      ${s.subagents.map((a) => `<div class="sub">└ ${a.name}${a.lastTool ? ' · ' + a.lastTool : ''}</div>`).join('')}
-    </div>`).join('') || '<div class="empty">Bu projede son 7 günde oturum yok.</div>';
-}
-
-function renderColumns(project) {
-  window.__project = project;
-  document.getElementById('cols').innerHTML = state.stages.map((stage) => {
-    const cards = project.tasks.filter((t) => t.stage === stage);
-    return `<div class="col">
-      <h3><span>${STAGE_LABEL[stage]}</span><span>${cards.length}</span></h3>
-      ${cards.map((t) => `
-        <div class="card">
-          <div class="subject">${t.subject}</div>
-          <div class="badges">
-            ${t.owner ? `<span class="badge owner">${t.owner}</span>` : ''}
-            ${t.testRounds ? `<span class="badge rounds">${t.testRounds}. test turu</span>` : ''}
-            <span class="badge">#${t.id}</span>
-          </div>
-          <div class="move">
-            ${state.stages.map((s) => `<button data-key="${t.key}" data-stage="${s}"
-              class="${s === t.stage ? 'on' : ''}">${STAGE_LABEL[s]}</button>`).join('')}
-          </div>
-          <select class="assign" data-key="${t.key}" data-from="${t.owner || ''}">
-            <option value="">— kimseye atanmadı —</option>
-            ${(project.crew || []).map((a) => `<option value="${a.name}"
-              ${a.name === t.owner ? 'selected' : ''}>${a.name}${a.queue ? ` (${a.queue})` : ''}</option>`).join('')}
-          </select>
-        </div>`).join('') || '<div class="empty">boş</div>'}
-    </div>`;
-  }).join('');
-
-  document.querySelectorAll('.move button').forEach((el) => {
-    el.onclick = async () => {
-      await fetch('/api/stage', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ key: el.dataset.key, stage: el.dataset.stage }),
-      });
-      await load();
-    };
-  });
-
-  document.querySelectorAll('select.assign').forEach((el) => {
-    el.onchange = async () => {
-      await fetch('/api/assign', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          key: el.dataset.key,
-          agent: el.value || null,
-          from: el.dataset.from || null,
-          project: selected,
-          event: el.dataset.from && el.value ? 'delivered' : 'assigned',
-        }),
-      });
-      await load();
-    };
-  });
-}
-
-function render() {
-  if (!state) return;
-  document.getElementById('meters').innerHTML = meters(state.tokens);
-  document.getElementById('clock').textContent = new Date(state.generatedAt).toLocaleTimeString('tr-TR');
-  if (!selected || !state.projects.some((p) => p.id === selected)) selected = state.projects[0]?.id || null;
-  renderProjects();
-  const project = state.projects.find((p) => p.id === selected);
-  if (!project) return;
-  renderSessions(project);
-  renderColumns(project);
-  office.update(project, state.roomLabels);
-  const totalActive = state.projects.reduce((n, p) => n + p.activeCount, 0);
-  document.getElementById('footer').textContent =
-    `${state.projects.length} proje · ${totalActive} ajan çalışıyor · veri kaynağı ~/.claude (salt okunur)`;
-}
-
-const notified = new Set();
-
-// Okundu işaretleri kalıcıdır; anahtar sohbetin son mesaj zamanını içerir, yani
-// aynı sohbetten YENİ bir soru gelirse tekrar uyarır.
-const READ_KEY = 'agent-board:read';
-const HIDE_KEY = 'agent-board:alerts-hidden';
-const readKeys = new Set(JSON.parse(localStorage.getItem(READ_KEY) || '[]'));
-const alertKey = (q) => `${q.sessionId}:${q.since}`;
-let alertsHidden = localStorage.getItem(HIDE_KEY) === '1';
-let alertSignature = '';
-
-function saveRead() {
-  localStorage.setItem(READ_KEY, JSON.stringify([...readKeys].slice(-300)));
-}
-
-function renderAlerts() {
-  const all = state.projects.flatMap((p) => p.questions || []);
-  const asks = all.filter((q) => q.isQuestion && q.fresh && !readKeys.has(alertKey(q)));
-  const idle = all.length - all.filter((q) => q.isQuestion && q.fresh).length;
-  const box = document.getElementById('alerts');
-
-  // İçerik değişmediyse DOM'a dokunma — 4 saniyede bir yeniden çizmek göz yoruyordu
-  const signature = `${alertsHidden}|${asks.map(alertKey).join(',')}|${idle}`;
-  if (signature === alertSignature) return;
-  alertSignature = signature;
-
-  if (asks.length === 0 && idle === 0) {
-    box.innerHTML = '';
-    return;
-  }
-
-  if (alertsHidden) {
-    box.innerHTML = `<button class="bell" id="alertsShow">
-      🔔 ${asks.length ? `${asks.length} soru` : `${idle} tur bitti`}</button>`;
-    document.getElementById('alertsShow').onclick = () => {
-      alertsHidden = false;
-      localStorage.removeItem(HIDE_KEY);
-      alertSignature = '';
-      renderAlerts();
-    };
-    return;
-  }
-
-  const shown = asks.slice(0, 3);
-  const rest = asks.length - shown.length;
-
-  box.innerHTML = `
-    <div class="alert-head">
-      <span>${asks.length ? `❓ ${asks.length} soru bekliyor` : 'yeni soru yok'}</span>
-      <span>
-        ${asks.length ? '<button id="markAll">tümünü okundu</button>' : ''}
-        <button id="hideAlerts" title="gizle">gizle</button>
-      </span>
-    </div>
-    ${shown.map((q) => `
-      <div class="alert" data-project="${q.project}" data-key="${alertKey(q)}">
-        <div class="who">
-          <span>❓ ${q.projectName}</span>
-          <span>${ago(q.since)} önce <b class="x" title="okundu">×</b></span>
-        </div>
-        <div class="txt">${q.text.replace(/[<>&]/g, ' ').trim()}</div>
-      </div>`).join('')}
-    ${rest > 0 ? `<div class="alert more">+${rest} soru daha</div>` : ''}
-    ${idle > 0 ? `<div class="alert quiet">${idle} sohbet turunu bitirmiş, sırada sen varsın</div>` : ''}`;
-
-  document.getElementById('hideAlerts').onclick = () => {
-    alertsHidden = true;
-    localStorage.setItem(HIDE_KEY, '1');
-    alertSignature = '';
-    renderAlerts();
-  };
-  const markAll = document.getElementById('markAll');
-  if (markAll) {
-    markAll.onclick = () => {
-      asks.forEach((q) => readKeys.add(alertKey(q)));
-      saveRead();
-      alertSignature = '';
-      renderAlerts();
-    };
-  }
-
-  box.querySelectorAll('.alert[data-project]').forEach((el) => {
-    el.onclick = (event) => {
-      if (event.target.classList.contains('x')) {
-        readKeys.add(el.dataset.key);
-        saveRead();
-        alertSignature = '';
-        renderAlerts();
-        return;
-      }
-      selected = el.dataset.project;
-      render();
-    };
-  });
-
-  for (const q of asks) {
-    const key = alertKey(q);
-    if (notified.has(key)) continue;
-    notified.add(key);
-    if (window.Notification?.permission === 'granted') {
-      new Notification(`${q.projectName} — sana soru soruldu`, { body: q.text.slice(0, 140) });
-    }
-  }
-}
-
-async function load() {
-  const res = await fetch('/api/state');
-  state = await res.json();
-  render();
-  renderAlerts();
-}
-
-if (window.Notification && Notification.permission === 'default') {
-  Notification.requestPermission().catch(() => {});
-}
-
-function setView(next) {
-  view = next;
-  document.getElementById('boardView').hidden = next !== 'board';
-  document.getElementById('officeView').hidden = next !== 'office';
-  document.getElementById('tabBoard').classList.toggle('on', next === 'board');
-  document.getElementById('tabOffice').classList.toggle('on', next === 'office');
-  if (next === 'office') office.start(); else office.stop();
-  localStorage.setItem('agent-board:view', next);
-}
-
-document.getElementById('tabBoard').onclick = () => setView('board');
-document.getElementById('tabOffice').onclick = () => setView('office');
-
-load();
-setInterval(load, 4000);
-setView(localStorage.getItem('agent-board:view') || 'board');
-</script>
+<script type="module" src="./app.js"></script>
 </body>
 </html>

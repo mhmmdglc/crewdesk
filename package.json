@@ -1,10 +1,10 @@
 {
-  "name": "agent-board",
+  "name": "crewdesk",
   "version": "0.1.0",
-  "description": "Local dashboard for Claude Code: every project, every agent, what stage the work is in, and how much of your token window is left.",
+  "description": "A local dashboard for Claude Code: every project, every agent, what stage the work is in, and how much of your token window is left.",
   "type": "module",
   "bin": {
-    "agent-board": "./bin/agent-board.mjs"
+    "crewdesk": "./bin/crewdesk.mjs"
   },
   "main": "./src/server.mjs",
   "files": [
@@ -15,19 +15,30 @@
     "LICENSE"
   ],
   "scripts": {
-    "start": "node bin/agent-board.mjs",
-    "dev": "node bin/agent-board.mjs --port 4600"
+    "start": "node bin/crewdesk.mjs",
+    "dev": "node bin/crewdesk.mjs --port 4601",
+    "check": "node --check src/server.mjs && node --check src/sources.mjs && node --check src/events.mjs && node --check src/board.mjs && node --check bin/crewdesk.mjs && node --check public/office.js && node --check public/app.js"
   },
   "engines": {
     "node": ">=20"
   },
   "keywords": [
     "claude-code",
-    "agents",
+    "claude",
+    "ai-agents",
+    "agent",
     "dashboard",
     "observability",
+    "monitoring",
     "kanban",
-    "token-usage"
+    "token-usage",
+    "pixel-art",
+    "developer-tools",
+    "cli"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/USER/crewdesk.git"
+  }
 }

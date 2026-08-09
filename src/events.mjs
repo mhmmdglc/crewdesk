@@ -20,9 +20,14 @@ export const ROOM_LABEL = {
 };
 
 let cache = null;
+let cacheMtime = 0;
 
 export async function readEvents() {
-  if (cache) return cache;
+  // dosya dışarıdan büyüdüyse (ikinci örnek, elle ekleme) yeniden oku
+  const stat = await fsp.stat(LOG_FILE).catch(() => null);
+  const mtime = stat?.mtimeMs || 0;
+  if (cache && mtime === cacheMtime) return cache;
+  cacheMtime = mtime;
   const raw = await fsp.readFile(LOG_FILE, 'utf8').catch(() => '');
   cache = raw
     .split('\n')
@@ -44,15 +49,23 @@ export async function appendEvent(event) {
   await fsp.mkdir(DATA_DIR, { recursive: true });
   await fsp.appendFile(LOG_FILE, JSON.stringify(record) + '\n');
   cache = [...(cache || []), record];
+  const stat = await fsp.stat(LOG_FILE).catch(() => null);
+  cacheMtime = stat?.mtimeMs || 0;
   return record;
 }
 
-function isQaRole(name = '') {
-  return /qa|test/i.test(name);
+// Rol tespiti alt-dize değil, tam etiket eşleşmesiyle: "protest-writer" ya da
+// "latest-news-agent" test odasına düşmemeli.
+const labelsOf = (name = '') => String(name).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+
+function isQaRole(name) {
+  const labels = labelsOf(name);
+  return labels.some((l) => ['qa', 'test', 'tester', 'testing', 'reviewer'].includes(l));
 }
 
-function isPmRole(name = '') {
-  return /manager|pm\b/i.test(name);
+function isPmRole(name) {
+  const labels = labelsOf(name);
+  return labels.some((l) => ['pm', 'manager', 'lead', 'orchestrator', 'coordinator'].includes(l));
 }
 
 /**
@@ -61,8 +74,15 @@ function isPmRole(name = '') {
  */
 export function deriveCrew({ roster, tasks, events, sessions = [] }) {
   const HANDOFF_LINGER = 3 * 60 * 1000;
-  const activeNames = new Set(sessions.filter((s) => s.activeAgent).map((s) => s.activeAgent));
-  const waitingNames = new Set();
+  const activeNames = new Set(sessions.flatMap((s) => (s.subagents || [])
+    .filter((a) => a.running).map((a) => a.name)));
+  // Bekleyen yalnızca, oturumu durduğunda elinde iş olan ajandır — o oturumun
+  // geçmişteki tüm alt-ajanları değil.
+  const waitingNames = new Set(sessions
+    .filter((s) => s.waitingForUser && s.activeAgent)
+    .map((s) => s.activeAgent));
+  const toolByAgent = new Map(sessions.flatMap((s) => (s.subagents || [])
+    .map((a) => [a.name, a.lastTool])));
   const byTask = new Map();
 
   for (const event of events) {
@@ -115,9 +135,9 @@ export function deriveCrew({ roster, tasks, events, sessions = [] }) {
     // koşmayan biri çalışmıyordur — dinlenme odasında bekler, yükü rozetinde görünür.
     let room;
     let idleAtDesk = false;
-    if (waiting) room = 'waiting';
+    if (active) room = isQaRole(agent.name) ? 'test' : 'work';   // koşuyorsa beklemiyordur
+    else if (waiting) room = 'waiting';
     else if (recentHandoff) room = 'handoff';
-    else if (active) room = isQaRole(agent.name) ? 'test' : 'work';
     else if (isPmRole(agent.name)) room = 'pm';
     else { room = 'lounge'; idleAtDesk = queue.length > 0; }
 
@@ -130,7 +150,7 @@ export function deriveCrew({ roster, tasks, events, sessions = [] }) {
       active,
       waiting,
       idleAtDesk,
-      tool: null,
+      tool: toolByAgent.get(agent.name) || null,
       question: null,
       queue: queue.length,
       currentTask: current ? { id: current.id, subject: current.subject, key: current.key } : null,

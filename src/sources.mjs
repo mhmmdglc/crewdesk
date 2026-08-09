@@ -10,24 +10,35 @@ const TASKS_DIR = path.join(CLAUDE_DIR, 'tasks');
 const MONITOR_DIR = path.join(CLAUDE_DIR, 'session-monitor');
 
 const TAIL_BYTES = 256 * 1024;
+const MAX_TAIL_BYTES = 8 * 1024 * 1024;
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const ACTIVE_MS = 90 * 1000;
 const IDLE_MS = 30 * 60 * 1000;
 
+// Transcript'lerde tek satır 1 MB'ı aşabiliyor. Sabit kuyruk okuması böyle bir
+// dosyada hiç tam satır yakalayamayıp oturumu tamamen kaybettiriyordu; o yüzden
+// tam satır bulunana kadar pencereyi geriye doğru genişletiyoruz.
 async function tailLines(file, bytes = TAIL_BYTES) {
   let handle;
   try {
     handle = await fsp.open(file, 'r');
     const { size } = await handle.stat();
-    const start = Math.max(0, size - bytes);
-    const length = size - start;
-    if (length <= 0) return [];
-    const buf = Buffer.alloc(length);
-    await handle.read(buf, 0, length, start);
-    const text = buf.toString('utf8');
-    const lines = text.split('\n');
-    if (start > 0) lines.shift();
-    return lines.filter((l) => l.trim().length > 0);
+    let window = bytes;
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const start = Math.max(0, size - window);
+      const length = size - start;
+      if (length <= 0) return [];
+      const buf = Buffer.alloc(length);
+      await handle.read(buf, 0, length, start);
+      const lines = buf.toString('utf8').split('\n');
+      if (start > 0) lines.shift();          // baştaki yarım satırı at
+      const complete = lines.filter((l) => l.trim().length > 0);
+      if (complete.length > 0 || start === 0) return complete;
+      window = Math.min(window * 4, MAX_TAIL_BYTES);
+      if (window >= size) window = size;
+    }
+    return [];
   } catch {
     return [];
   } finally {
@@ -54,7 +65,14 @@ function toolsFromEntry(entry) {
 }
 
 // Türkçe ve İngilizce soru kalıpları — "tur bitti" ile "sana soru soruldu" farkı bu.
-const ASK_PATTERNS = /\b(mı|mi|mu|mü|musun|misin|mısın|müsün|hangisi|hangisini|ister misin|onaylıyor|onaylar mısın|ne yapayım|devam edeyim|edelim mi|should i|shall i|which one|do you want|confirm)\b/i;
+// \b ASCII tabanlı olduğu için "kaldığımız" içindeki "mı" eşleşiyordu; Türkçe
+// harfleri de kelime karakteri sayan kendi sınırımızı kuruyoruz.
+const W = '0-9A-Za-zÇçĞğİıÖöŞşÜü_';
+const ASK_PATTERNS = new RegExp(
+  `(^|[^${W}])(mı|mi|mu|mü|musun|misin|mısın|müsün|hangisi|hangisini|ne yapayım|devam edeyim|edelim mi`
+  + `|onaylıyor musun|onaylar mısın|ister misin|should i|shall i|which one|do you want|could you confirm)([^${W}]|$)`,
+  'i',
+);
 
 function summarizeTurn(text, ts) {
   // kod bloklarını, tablo satırlarını ve dosya yollarını at; anlamlı son cümleyi bul
@@ -189,6 +207,41 @@ async function scanSession(file) {
   };
 }
 
+// Bir alt-ajan çalışırken ana transcript'e satır yazılmaz; canlılık sinyali
+// yalnızca kendi dosyasının mtime'ında görünür. Ana dosyaya bakmak, 90 sn'den
+// uzun süren her alt-ajanı görünmez yapıyordu.
+async function scanSubagents(sessionDir) {
+  const dir = path.join(sessionDir, 'subagents');
+  const files = await fsp.readdir(dir).catch(() => []);
+  const agents = [];
+
+  for (const file of files) {
+    if (!file.endsWith('.jsonl')) continue;
+    const full = path.join(dir, file);
+    const stat = await fsp.stat(full).catch(() => null);
+    if (!stat || Date.now() - stat.mtimeMs > SESSION_MAX_AGE_MS) continue;
+
+    const entries = parseLines(await tailLines(full, 64 * 1024));
+    let lastTool = null;
+    let name = null;
+    for (const entry of entries) {
+      // Claude Code alt-ajanın rolünü attributionAgent alanında taşıyor
+      if (entry.attributionAgent) name = entry.attributionAgent;
+      for (const tool of toolsFromEntry(entry)) lastTool = prettyTool(tool.name);
+    }
+
+    agents.push({
+      name: name || file.replace(/^agent-/, '').replace(/\.jsonl$/, '').slice(0, 24),
+      lastTool,
+      lastTs: stat.mtimeMs,
+      running: Date.now() - stat.mtimeMs <= ACTIVE_MS,
+    });
+  }
+
+  agents.sort((a, b) => b.lastTs - a.lastTs);
+  return agents;
+}
+
 function decodeProjectDir(dirName) {
   if (!dirName.startsWith('-')) return dirName;
   return dirName.replace(/^-/, '/').replace(/-/g, '/');
@@ -207,7 +260,18 @@ export async function scanProjects() {
     for (const f of files) {
       if (!f.endsWith('.jsonl')) continue;
       const session = await scanSession(path.join(dirPath, f));
-      if (session) sessions.push(session);
+      if (!session) continue;
+      // Alt-ajanlar ayrı dosyada koşuyor: <sessionId>/subagents/agent-*.jsonl
+      session.subagents = await scanSubagents(path.join(dirPath, session.sessionId));
+      session.activeAgent = session.subagents.find((a) => a.running)?.name || null;
+      // Alt-ajanı koşan oturum çalışıyordur; senin cevabını beklemiyordur
+      if (session.activeAgent) {
+        session.running = true;
+        session.waitingForUser = false;
+        session.question = null;
+        session.status = 'active';
+      }
+      sessions.push(session);
     }
 
     if (sessions.length === 0) continue;
@@ -306,8 +370,10 @@ export function readTokenWindows() {
     let total = 0;
     for (const [key, value] of Object.entries(map)) {
       const bucket = Number(key.includes(':') ? key.split(':')[0] : key);
-      if (!Number.isFinite(bucket)) continue;
-      if (bucket > nowBucket - hours && bucket <= nowBucket) total += value;
+      const amount = Number(value);
+      // kova değeri string/null gelirse toplam string'e dönüyordu
+      if (!Number.isFinite(bucket) || !Number.isFinite(amount)) continue;
+      if (bucket > nowBucket - hours && bucket <= nowBucket) total += amount;
     }
     return total;
   };
@@ -318,8 +384,9 @@ export function readTokenWindows() {
       const [bucketStr, sessionId] = key.split(':');
       const bucket = Number(bucketStr);
       if (!Number.isFinite(bucket) || !sessionId) continue;
-      if (bucket <= nowBucket - 5 || bucket > nowBucket) continue;
-      perSession[sessionId] = (perSession[sessionId] || 0) + value;
+      const amount = Number(value);
+      if (bucket <= nowBucket - 5 || bucket > nowBucket || !Number.isFinite(amount)) continue;
+      perSession[sessionId] = (perSession[sessionId] || 0) + amount;
     }
   }
 

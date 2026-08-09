@@ -170,6 +170,8 @@ export class Office {
 
     for (const member of crew) {
       const id = `${member.kind}:${member.name}`;
+      // aynı adı taşıyan iki tanım tek karakter çizdiriyordu ama sayacı iki artırıyordu
+      if (seen.has(id)) continue;
       perRoom[member.room] = (perRoom[member.room] || 0) + 1;
       const target = this.seat(member.room, perRoom[member.room] - 1);
       seen.add(id);
@@ -507,8 +509,8 @@ export class Office {
       }
       this.drawPerson(p, walking);
 
-      if (p.task && !walking) {
-        this.tag(p.x + 8 * PX, p.y - 26 * PX, `#${p.task.id}`, 'rgba(14,13,20,0.92)', '#e8e6f0');
+      if (p.currentTask && !walking) {
+        this.tag(p.x + 8 * PX, p.y - 26 * PX, `#${p.currentTask.id}`, 'rgba(14,13,20,0.92)', '#e8e6f0');
       }
       if (p.tool && p.active) {
         this.tag(p.x + 8 * PX, p.y - 38 * PX, p.tool.slice(0, 22), 'rgba(14,13,20,0.92)', '#4ade80');
@@ -539,7 +541,7 @@ export class Office {
       const h = this.hover;
       const text = h.question?.text
         ? `${h.name}: ${h.question.text.slice(-70)}`
-        : h.task ? `${h.name}: #${h.task.id} ${h.task.subject}`
+        : h.currentTask ? `${h.name}: #${h.currentTask.id} ${h.currentTask.subject}`
           : h.description ? `${h.name} — ${h.description}`
             : `${h.name}: kuyruk boş`;
       ctx.font = `${8 * PX}px ui-monospace, Menlo, monospace`;
