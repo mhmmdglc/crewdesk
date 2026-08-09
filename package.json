@@ -4,7 +4,7 @@
   "description": "A local dashboard for Claude Code: every project, every agent, what stage the work is in, and how much of your token window is left.",
   "type": "module",
   "bin": {
-    "crewdesk": "./bin/crewdesk.mjs"
+    "crewdesk": "bin/crewdesk.mjs"
   },
   "main": "./src/server.mjs",
   "files": [
