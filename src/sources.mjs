@@ -177,6 +177,39 @@ export async function scanProjects() {
   return projects;
 }
 
+const FRONT_MATTER = /^---\r?\n([\s\S]*?)\r?\n---/;
+
+function frontField(block, key) {
+  const match = block.match(new RegExp(`^${key}:\\s*(.*)$`, 'm'));
+  return match ? match[1].trim() : null;
+}
+
+// Her projenin kendi ajan kadrosu vardır: <proje>/.claude/agents/*.md
+export async function readAgentRoster(projectPath) {
+  const dir = path.join(projectPath, '.claude', 'agents');
+  const files = await fsp.readdir(dir).catch(() => []);
+  const roster = [];
+
+  for (const file of files) {
+    if (!file.endsWith('.md')) continue;
+    const raw = await fsp.readFile(path.join(dir, file), 'utf8').catch(() => null);
+    if (!raw) continue;
+    const front = raw.match(FRONT_MATTER);
+    if (!front) continue;
+    const name = frontField(front[1], 'name') || path.basename(file, '.md');
+    const description = frontField(front[1], 'description') || '';
+    roster.push({
+      name,
+      color: frontField(front[1], 'color'),
+      restricted: Boolean(frontField(front[1], 'tools')),
+      description: description.replace(/^["']|["']$/g, '').slice(0, 160),
+    });
+  }
+
+  roster.sort((a, b) => a.name.localeCompare(b.name));
+  return roster;
+}
+
 export async function readTasks(sessionId) {
   const dir = path.join(TASKS_DIR, sessionId);
   const files = await fsp.readdir(dir).catch(() => []);

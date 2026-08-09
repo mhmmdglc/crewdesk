@@ -2,7 +2,7 @@ import http from 'node:http';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scanProjects, readTasks, readTokenWindows } from './sources.mjs';
+import { scanProjects, readTasks, readTokenWindows, readAgentRoster } from './sources.mjs';
 import { decorate, setStage, STAGES } from './board.mjs';
 
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
@@ -25,9 +25,18 @@ async function buildState() {
       tasks.push(...(await readTasks(session.sessionId)));
     }
     const decorated = await decorate(tasks);
+    const roster = await readAgentRoster(project.path);
+    const activeAgentNames = new Set(
+      project.sessions.flatMap((s) => s.subagents.map((a) => a.name)),
+    );
 
     enriched.push({
       ...project,
+      roster: roster.map((agent) => ({
+        ...agent,
+        active: activeAgentNames.has(agent.name),
+        load: decorated.filter((t) => t.owner === agent.name && t.stage !== 'done').length,
+      })),
       sessions: project.sessions.map((s) => ({
         ...s,
         tokensFiveHour: tokens.perSessionFiveHour[s.sessionId] || 0,

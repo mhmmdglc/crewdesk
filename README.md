@@ -12,6 +12,8 @@ Built for the moment you have Claude Code running in four repos at once and you 
 
 **Top — token windows.** Rolling **5-hour** and **7-day** token consumption, computed from Claude Code's own hourly buckets. When Claude Code publishes official limit gauges, they are rendered as progress bars next to the raw numbers.
 
+**Center, top — the project's crew.** Each project has its own agent roster (`<project>/.claude/agents/*.md`) — agent-board reads it, so kordinat shows `be-specialist / payment-specialist / qa-reviewer…` while another repo shows `backend-dev / ux-designer / release-manager…`. Active agents glow and carry a speech bubble with the tool they are running. Projects without a roster fall back to showing live sessions.
+
 **Center, top — live sessions.** Each session in the selected project: its title, git branch, the tool it is running right now, how long since it moved, its 5-hour token spend, and any sub-agents it spawned.
 
 **Center — the stage board.** Work items in four columns: **Manager → Geliştirme (dev) → Test → Bitti (done)**. Move a card by clicking a stage. Moving a card *backwards out of Test* increments its test-round counter, so a card that has bounced twice says so on its face.
@@ -65,6 +67,7 @@ Claude Code tasks have three states: `pending`, `in_progress`, `completed`. A de
 - [ ] Assign an owner agent per card from the UI (currently API-only)
 - [x] Pixel office view (rooms = stages, characters = work items)
 - [ ] Drag and drop between columns
+- [x] Per-project agent roster read from `.claude/agents`
 - [ ] Per-project stage configuration (not every team has the same four stages)
 - [ ] Desktop notification when a session flips to *waiting for input*
 - [ ] Cost estimate per project from token buckets
@@ -76,6 +79,10 @@ Claude Code tasks have three states: `pending`, `in_progress`, `completed`. A de
 - `GET /api/state` — the whole board as JSON
 - `POST /api/stage` — `{ "key": "<sessionId>:<taskId>", "stage": "manager|dev|test|done", "owner": "optional" }`
 - `GET /api/health`
+
+## Credits
+
+Character sprites are from **MetroCity — Free Topdown Character Pack** by [JIK-A-4](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack), released under **CC0 1.0** (public domain). Attribution is not required by the licence; it is here because the pack is good. Furniture, rooms and everything else are drawn procedurally in `public/office.js`.
 
 ## License
 
