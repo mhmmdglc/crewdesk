@@ -63,6 +63,7 @@ Claude Code tasks have three states: `pending`, `in_progress`, `completed`. A de
 
 - [ ] i18n — the UI ships Turkish today; strings need extracting
 - [ ] Assign an owner agent per card from the UI (currently API-only)
+- [x] Pixel office view (rooms = stages, characters = work items)
 - [ ] Drag and drop between columns
 - [ ] Per-project stage configuration (not every team has the same four stages)
 - [ ] Desktop notification when a session flips to *waiting for input*

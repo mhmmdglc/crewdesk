@@ -72,11 +72,25 @@
   .move button.on { background: var(--accent); color: #14131a; border-color: var(--accent); font-weight: 700; }
   .empty { color: var(--dim); font-size: 11px; padding: 6px 2px; }
   footer { color: var(--dim); font-size: 11px; padding: 8px 16px; }
+
+  .tabs { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .tabs button { background: var(--panel-2); border: 0; padding: 5px 14px; color: var(--dim); font-size: 12px; }
+  .tabs button.on { background: var(--accent); color: #14131a; font-weight: 700; }
+  .tabs button:not(.on):hover { color: var(--text); }
+  #officeView canvas {
+    width: 100%; height: auto; display: block; border: 1px solid var(--line);
+    border-radius: 10px; image-rendering: pixelated; background: var(--bg);
+  }
+  .hint { color: var(--dim); font-size: 11px; margin-top: 8px; }
 </style>
 </head>
 <body>
 <header>
   <div class="brand">agent-board</div>
+  <div class="tabs">
+    <button id="tabBoard" class="on">Tahta</button>
+    <button id="tabOffice">Ofis</button>
+  </div>
   <div class="meters" id="meters"></div>
   <div style="margin-left:auto" class="pill" id="clock"></div>
 </header>
@@ -87,16 +101,30 @@
     <div id="projects"></div>
   </aside>
   <section>
-    <div class="sessions" id="sessions"></div>
-    <div class="cols" id="cols"></div>
+    <div id="boardView">
+      <div class="sessions" id="sessions"></div>
+      <div class="cols" id="cols"></div>
+    </div>
+    <div id="officeView" hidden>
+      <canvas id="officeCanvas"></canvas>
+      <div class="hint">
+        Odalar aşamalardır; her karakter bir iş kalemidir ve aşama değişince odasına yürür.
+        Üstteki şerit o projede canlı çalışan oturumlar — balonda o an çalıştırdıkları tool yazar.
+        ↺ işareti kaçıncı test turunda olduğunu gösterir. Karakterin üstüne gelince işin başlığı çıkar.
+      </div>
+    </div>
   </section>
 </main>
 <footer id="footer"></footer>
 
-<script>
+<script type="module">
+import { Office } from './office.js';
+
 const STAGE_LABEL = { manager: 'Manager', dev: 'Geliştirme', test: 'Test', done: 'Bitti' };
 let selected = null;
 let state = null;
+let view = 'board';
+const office = new Office(document.getElementById('officeCanvas'));
 
 const fmt = (n) => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'K' : String(n);
 const ago = (ts) => {
@@ -203,6 +231,7 @@ function render() {
   if (!project) return;
   renderSessions(project);
   renderColumns(project);
+  office.update(project, state.stages);
   const totalActive = state.projects.reduce((n, p) => n + p.activeCount, 0);
   document.getElementById('footer').textContent =
     `${state.projects.length} proje · ${totalActive} ajan çalışıyor · veri kaynağı ~/.claude (salt okunur)`;
@@ -214,8 +243,22 @@ async function load() {
   render();
 }
 
+function setView(next) {
+  view = next;
+  document.getElementById('boardView').hidden = next !== 'board';
+  document.getElementById('officeView').hidden = next !== 'office';
+  document.getElementById('tabBoard').classList.toggle('on', next === 'board');
+  document.getElementById('tabOffice').classList.toggle('on', next === 'office');
+  if (next === 'office') office.start(); else office.stop();
+  localStorage.setItem('agent-board:view', next);
+}
+
+document.getElementById('tabBoard').onclick = () => setView('board');
+document.getElementById('tabOffice').onclick = () => setView('office');
+
 load();
 setInterval(load, 4000);
+setView(localStorage.getItem('agent-board:view') || 'board');
 </script>
 </body>
 </html>
