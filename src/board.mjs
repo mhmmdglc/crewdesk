@@ -52,6 +52,15 @@ export async function decorate(tasks) {
   });
 }
 
+export async function setOwner(key, owner) {
+  const overlay = await readOverlay();
+  const entry = overlay[key] || { testRounds: 0, history: [] };
+  entry.owner = owner || null;
+  overlay[key] = entry;
+  await writeOverlay(overlay);
+  return entry;
+}
+
 export async function setStage(key, stage, owner) {
   if (!STAGES.includes(stage)) throw new Error(`unknown stage: ${stage}`);
   const overlay = await readOverlay();

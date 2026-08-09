@@ -16,6 +16,8 @@ Built for the moment you have Claude Code running in four repos at once and you 
 
 **Center, top — live sessions.** Each session in the selected project: its title, git branch, the tool it is running right now, how long since it moved, its 5-hour token spend, and any sub-agents it spawned.
 
+**Ofis view — the crew at work.** Characters are *agents*, not tasks. Rooms are what each agent is doing right now: **PM odası** (the orchestrator), **Çalışma odası**, **Test odası**, **Teslim odası** (finished work waiting to be picked up), **Bekleme odası** (blocked on your permission) and **Dinlenme odası** (empty queue). The label above an agent's head is the task in hand, the badge on their shoulder is their queue length. Nothing about position is stored — it is derived from the handoff log, so the office, the board and the stats all read from one source.
+
 **Center — the stage board.** Work items in four columns: **Manager → Geliştirme (dev) → Test → Bitti (done)**. Move a card by clicking a stage. Moving a card *backwards out of Test* increments its test-round counter, so a card that has bounced twice says so on its face.
 
 ## Install & run
@@ -52,8 +54,9 @@ Everything is read from Claude Code's local state. agent-board never writes to i
 | `~/.claude/tasks/<sessionId>/*.json` | work items (id, subject, status) |
 | `~/.claude/session-monitor/token-buckets.json` | hourly token buckets → 5-hour and 7-day windows, per session attribution |
 | `~/.claude/session-monitor/official-usage.json` | official limit gauges, when Claude Code has populated them |
+| `<project>/.claude/agents/*.md` | the project's own agent roster: name, colour, role |
 
-The only thing agent-board writes is its own stage overlay: `~/.agent-board/overlay.json`, keyed by `sessionId:taskId`, holding stage, owner, test-round count and a short history. Delete that file and you are back to derived stages.
+agent-board writes two files of its own. `~/.agent-board/events.jsonl` is the handoff log — one append-only line per `assigned` / `started` / `delivered` / `returned` / `done`, from which queues, rooms, test rounds and cycle times are all derived. The other is the stage overlay: `~/.agent-board/overlay.json`, keyed by `sessionId:taskId`, holding stage, owner, test-round count and a short history. Delete that file and you are back to derived stages.
 
 Transcripts are read from the tail only (last 256 KB per session), so multi-hundred-megabyte session files cost nothing.
 
@@ -64,7 +67,8 @@ Claude Code tasks have three states: `pending`, `in_progress`, `completed`. A de
 ## Roadmap
 
 - [ ] i18n — the UI ships Turkish today; strings need extracting
-- [ ] Assign an owner agent per card from the UI (currently API-only)
+- [x] Assign an owner agent per card from the UI
+- [ ] Infer assignment automatically from `Agent` tool calls and `SubagentStop`
 - [x] Pixel office view (rooms = stages, characters = work items)
 - [ ] Drag and drop between columns
 - [x] Per-project agent roster read from `.claude/agents`

@@ -82,6 +82,11 @@
     border-radius: 10px; image-rendering: pixelated; background: var(--bg);
   }
   .hint { color: var(--dim); font-size: 11px; margin-top: 8px; }
+  select.assign {
+    width: 100%; margin-top: 7px; background: #2b2937; color: var(--text);
+    border: 1px solid var(--line); border-radius: 6px; padding: 3px 5px; font-size: 11px;
+  }
+  select.assign:hover { border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -108,9 +113,12 @@
     <div id="officeView" hidden>
       <canvas id="officeCanvas"></canvas>
       <div class="hint">
-        Odalar aşamalardır; her karakter bir iş kalemidir ve aşama değişince odasına yürür.
-        Üstteki şerit o projede canlı çalışan oturumlar — balonda o an çalıştırdıkları tool yazar.
-        ↺ işareti kaçıncı test turunda olduğunu gösterir. Karakterin üstüne gelince işin başlığı çıkar.
+        Her karakter bir <b>ajandır</b>, odalar o an ne yaptığını gösterir.
+        Başının üstündeki etiket elindeki iş, omzundaki mor sayı kuyruğundaki iş adedi,
+        altındaki renk çizgisi rolünün rengi. Kuyruğu biten dinlenme odasına geçer;
+        senin onayını bekleyen bekleme odasına düşer; biten iş teslim odasına bırakılır ve
+        PM oradan alıp yeniden dağıtır. ↺ kaçıncı test turu olduğunu söyler.
+        Atamayı Tahta sekmesindeki kartlardan yaparsın.
       </div>
     </div>
   </section>
@@ -189,6 +197,7 @@ function renderSessions(project) {
 }
 
 function renderColumns(project) {
+  window.__project = project;
   document.getElementById('cols').innerHTML = state.stages.map((stage) => {
     const cards = project.tasks.filter((t) => t.stage === stage);
     return `<div class="col">
@@ -205,6 +214,11 @@ function renderColumns(project) {
             ${state.stages.map((s) => `<button data-key="${t.key}" data-stage="${s}"
               class="${s === t.stage ? 'on' : ''}">${STAGE_LABEL[s]}</button>`).join('')}
           </div>
+          <select class="assign" data-key="${t.key}" data-from="${t.owner || ''}">
+            <option value="">— kimseye atanmadı —</option>
+            ${(project.crew || []).map((a) => `<option value="${a.name}"
+              ${a.name === t.owner ? 'selected' : ''}>${a.name}${a.queue ? ` (${a.queue})` : ''}</option>`).join('')}
+          </select>
         </div>`).join('') || '<div class="empty">boş</div>'}
     </div>`;
   }).join('');
@@ -215,6 +229,23 @@ function renderColumns(project) {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ key: el.dataset.key, stage: el.dataset.stage }),
+      });
+      await load();
+    };
+  });
+
+  document.querySelectorAll('select.assign').forEach((el) => {
+    el.onchange = async () => {
+      await fetch('/api/assign', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          key: el.dataset.key,
+          agent: el.value || null,
+          from: el.dataset.from || null,
+          project: selected,
+          event: el.dataset.from && el.value ? 'delivered' : 'assigned',
+        }),
       });
       await load();
     };
@@ -231,7 +262,7 @@ function render() {
   if (!project) return;
   renderSessions(project);
   renderColumns(project);
-  office.update(project, state.stages);
+  office.update(project, state.roomLabels);
   const totalActive = state.projects.reduce((n, p) => n + p.activeCount, 0);
   document.getElementById('footer').textContent =
     `${state.projects.length} proje · ${totalActive} ajan çalışıyor · veri kaynağı ~/.claude (salt okunur)`;

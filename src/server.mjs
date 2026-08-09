@@ -3,7 +3,8 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scanProjects, readTasks, readTokenWindows, readAgentRoster } from './sources.mjs';
-import { decorate, setStage, STAGES } from './board.mjs';
+import { decorate, setStage, setOwner, STAGES } from './board.mjs';
+import { readEvents, appendEvent, deriveCrew, ROOMS, ROOM_LABEL } from './events.mjs';
 
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
@@ -26,17 +27,16 @@ async function buildState() {
     }
     const decorated = await decorate(tasks);
     const roster = await readAgentRoster(project.path);
-    const activeAgentNames = new Set(
-      project.sessions.flatMap((s) => s.subagents.map((a) => a.name)),
+    const events = (await readEvents()).filter((e) => !e.project || e.project === project.id);
+
+    const activeNames = new Set(project.sessions.flatMap((s) => s.subagents.map((a) => a.name)));
+    const waitingNames = new Set(
+      project.sessions.filter((s) => s.status === 'waiting').flatMap((s) => s.subagents.map((a) => a.name)),
     );
 
     enriched.push({
       ...project,
-      roster: roster.map((agent) => ({
-        ...agent,
-        active: activeAgentNames.has(agent.name),
-        load: decorated.filter((t) => t.owner === agent.name && t.stage !== 'done').length,
-      })),
+      crew: deriveCrew({ roster, tasks: decorated, events, activeNames, waitingNames }),
       sessions: project.sessions.map((s) => ({
         ...s,
         tokensFiveHour: tokens.perSessionFiveHour[s.sessionId] || 0,
@@ -49,7 +49,14 @@ async function buildState() {
     });
   }
 
-  return { generatedAt: Date.now(), stages: STAGES, projects: enriched, tokens };
+  return {
+    generatedAt: Date.now(),
+    stages: STAGES,
+    rooms: ROOMS,
+    roomLabels: ROOM_LABEL,
+    projects: enriched,
+    tokens,
+  };
 }
 
 function json(res, code, body) {
@@ -105,6 +112,26 @@ export function createServer() {
         if (!body.key || !body.stage) return json(res, 400, { error: 'key ve stage zorunlu' });
         const entry = await setStage(body.key, body.stage, body.owner);
         return json(res, 200, { ok: true, entry });
+      }
+
+      // İşi bir ajana ata: hem sahibi yaz, hem devir teslim kütüğüne düş
+      if (req.method === 'POST' && url.pathname === '/api/assign') {
+        const body = await readBody(req);
+        if (!body.key) return json(res, 400, { error: 'key zorunlu' });
+        await setOwner(body.key, body.agent || null);
+        const record = await appendEvent({
+          taskKey: body.key,
+          taskId: body.taskId ?? null,
+          project: body.project ?? null,
+          from: body.from ?? null,
+          to: body.agent || null,
+          event: body.event || 'assigned',
+        });
+        return json(res, 200, { ok: true, record });
+      }
+
+      if (req.method === 'GET' && url.pathname === '/api/events') {
+        return json(res, 200, { events: await readEvents() });
       }
 
       if (req.method === 'GET' && url.pathname === '/api/health') {
