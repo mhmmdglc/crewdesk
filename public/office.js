@@ -37,24 +37,39 @@ const AGENT_COLOR = {
 
 const FURNITURE = {
   desk: 'furniture/DESK/DESK_FRONT.png',
+  deskSide: 'furniture/DESK/DESK_SIDE.png',
   pcOn1: 'furniture/PC/PC_FRONT_ON_1.png',
   pcOn2: 'furniture/PC/PC_FRONT_ON_2.png',
   pcOn3: 'furniture/PC/PC_FRONT_ON_3.png',
   pcOff: 'furniture/PC/PC_FRONT_OFF.png',
+  pcSide: 'furniture/PC/PC_SIDE.png',
+  pcBack: 'furniture/PC/PC_BACK.png',
   sofa: 'furniture/SOFA/SOFA_FRONT.png',
+  sofaBack: 'furniture/SOFA/SOFA_BACK.png',
+  sofaSide: 'furniture/SOFA/SOFA_SIDE.png',
   coffeeTable: 'furniture/COFFEE_TABLE/COFFEE_TABLE.png',
   bookshelf: 'furniture/BOOKSHELF/BOOKSHELF.png',
+  bookshelf2: 'furniture/DOUBLE_BOOKSHELF/DOUBLE_BOOKSHELF.png',
   clock: 'furniture/CLOCK/CLOCK.png',
   whiteboard: 'furniture/WHITEBOARD/WHITEBOARD.png',
   plant: 'furniture/PLANT/PLANT.png',
+  plant2: 'furniture/PLANT_2/PLANT_2.png',
   largePlant: 'furniture/LARGE_PLANT/LARGE_PLANT.png',
   cactus: 'furniture/CACTUS/CACTUS.png',
-  chair: 'furniture/CUSHIONED_CHAIR/CUSHIONED_CHAIR_FRONT.png',
-  bench: 'furniture/CUSHIONED_BENCH/CUSHIONED_BENCH_FRONT.png',
+  pot: 'furniture/POT/POT.png',
+  hangingPlant: 'furniture/HANGING_PLANT/HANGING_PLANT.png',
+  chairFront: 'furniture/CUSHIONED_CHAIR/CUSHIONED_CHAIR_FRONT.png',
+  chairBack: 'furniture/CUSHIONED_CHAIR/CUSHIONED_CHAIR_BACK.png',
+  woodChairBack: 'furniture/WOODEN_CHAIR/WOODEN_CHAIR_BACK.png',
+  woodChairFront: 'furniture/WOODEN_CHAIR/WOODEN_CHAIR_FRONT.png',
+  bench: 'furniture/CUSHIONED_BENCH/CUSHIONED_BENCH.png',
+  woodBench: 'furniture/WOODEN_BENCH/WOODEN_BENCH.png',
   bin: 'furniture/BIN/BIN.png',
   painting: 'furniture/LARGE_PAINTING/LARGE_PAINTING.png',
   smallPainting: 'furniture/SMALL_PAINTING/SMALL_PAINTING.png',
-  smallTable: 'furniture/SMALL_TABLE/SMALL_TABLE.png',
+  smallPainting2: 'furniture/SMALL_PAINTING_2/SMALL_PAINTING_2.png',
+  smallTable: 'furniture/SMALL_TABLE/SMALL_TABLE_FRONT.png',
+  bigTable: 'furniture/TABLE_FRONT/TABLE_FRONT.png',
   coffee: 'furniture/COFFEE/COFFEE.png',
 };
 
@@ -115,17 +130,33 @@ export class Office {
     return { x: GAP + colIndex * (w + GAP), y: GAP + rowIndex * (h + GAP), w, h };
   }
 
+  // Her odanın kendi oturma düzeni var: masa başı, bank sırası, koltuk önü…
   seat(room, index) {
     const rect = this.roomRect(room);
-    const cellW = 52 * PX;
-    const cellH = 50 * PX;
-    const perRow = Math.max(1, Math.floor((rect.w - 10 * PX) / cellW));
+    const at = (ax, ay) => ({ x: rect.x + ax * PX, y: rect.y + ay * PX });
+
+    if (room === 'waiting') {
+      // bank sırası: yan yana otururlar
+      return at(28 + index * 26, 108);
+    }
+    if (room === 'lounge') {
+      // TV'nin karşısındaki koltuk
+      return at(74 + index * 24, 112);
+    }
+    if (room === 'handoff') {
+      // paketleme masasının önünde ayakta
+      return at(112 + index * 26, 96);
+    }
+    if (room === 'pm') {
+      // yönetici masası solda, ziyaretçiler toplantı masasında
+      if (index === 0) return at(30, 52);
+      return at(96 + ((index - 1) % 3) * 30, 118);
+    }
+    // work / test: sıralı masalar
+    const perRow = 3;
     const col = index % perRow;
     const row = Math.floor(index / perRow);
-    return {
-      x: rect.x + 14 * PX + col * cellW,
-      y: rect.y + WALL_H + 22 * PX + row * cellH,
-    };
+    return at(30 + col * 62, 50 + row * 58);
   }
 
   update(project, roomLabels) {
@@ -242,51 +273,113 @@ export class Office {
   }
 
   drawTv(x, y) {
-    const flicker = Math.sin(this.tick * 0.08) > 0;
-    this.p(x - 1 * PX, y - 1 * PX, 34 * PX, 22 * PX, '#15131c');
-    this.p(x, y, 32 * PX, 20 * PX, '#1f2b3a');
-    this.p(x + 2 * PX, y + 2 * PX, 28 * PX, 16 * PX, flicker ? '#3f6f8f' : '#37627e');
-    this.p(x + 4 * PX, y + 4 * PX, 10 * PX, 4 * PX, 'rgba(255,255,255,0.25)');
-    this.p(x + 12 * PX, y + 20 * PX, 8 * PX, 3 * PX, '#2a2634');
+    const t = this.tick;
+    this.p(x - 2 * PX, y + 2 * PX, 48 * PX, 30 * PX, '#0d0c12');
+    this.p(x, y + 4 * PX, 44 * PX, 26 * PX, '#20242e');
+    this.p(x + 2 * PX, y + 6 * PX, 40 * PX, 22 * PX, '#2b4a63');
+    // yayın: kayan renk bantları
+    for (let i = 0; i < 5; i++) {
+      const shade = ['#3f6f8f', '#4d86a6', '#37627e', '#5b9ab9', '#33586f'][(i + Math.floor(t / 14)) % 5];
+      this.p(x + 2 * PX, y + (6 + i * 4.4) * PX, 40 * PX, 4.4 * PX, shade);
+    }
+    this.p(x + 5 * PX, y + 8 * PX, 12 * PX, 4 * PX, 'rgba(255,255,255,0.22)');
+    this.p(x + 18 * PX, y + 30 * PX, 8 * PX, 4 * PX, '#2a2634');
+    this.p(x + 14 * PX, y + 33 * PX, 16 * PX, 2 * PX, '#20242e');
+  }
+
+  box(ax, ay, w = 11, h = 8) {
+    this.p(ax * PX, (ay + 2) * PX, w * PX, (h - 2) * PX, '#b99b74');
+    this.p(ax * PX, ay * PX, w * PX, 3 * PX, '#d8b98c');
+    this.p((ax + w / 2 - 1) * PX, ay * PX, 2 * PX, h * PX, '#8d7250');
   }
 
   decorate(room, rect) {
-    const right = rect.x + rect.w;
-    const bottom = rect.y + rect.h;
+    const ctx = this.ctx;
+    // oda-yerel koordinat: sol üst köşe (0,0), sanat pikseli cinsinden
+    const s = (key, ax, ay) => this.sprite(key, rect.x + ax * PX, rect.y + ay * PX);
+    const box = (ax, ay, w, h) => this.box(rect.x / PX + ax, rect.y / PX + ay, w, h);
+    const W = rect.w / PX;
+    const H = rect.h / PX;
 
-    if (room === 'work') {
-      this.sprite('whiteboard', rect.x + 10 * PX, rect.y + 2 * PX);
-      this.sprite('bin', right - 20 * PX, bottom - 22 * PX);
-      this.sprite('largePlant', right - 40 * PX, bottom - 50 * PX);
+    if (room === 'pm') {
+      // yönetici odası: duvarda kitaplık + saat + tablo, ortada toplantı masası
+      s('bookshelf2', 8, 4);
+      s('clock', 78, 0);
+      s('painting', 150, 2);
+      s('bigTable', 92, 106);
+      s('woodChairBack', 100, 92);
+      s('woodChairBack', 124, 92);
+      s('woodChairFront', 100, 168);
+      s('woodChairFront', 124, 168);
+      s('bookshelf', 8, 40);
+      s('largePlant', W - 42, H - 54);
+      s('pot', 8, H - 22);
+    } else if (room === 'work') {
+      // açık ofis: duvarda plan tahtası, köşede çöp + bitki, kahve köşesi
+      s('whiteboard', 8, -2);
+      s('smallPainting2', 150, 0);
+      s('smallTable', W - 44, H - 40);
+      s('coffee', W - 36, H - 46);
+      s('bin', W - 22, H - 20);
+      s('largePlant', 8, H - 54);
+      s('plant2', W - 66, H - 34);
     } else if (room === 'test') {
-      this.sprite('whiteboard', right - 42 * PX, rect.y + 2 * PX);
-      this.sprite('cactus', rect.x + 8 * PX, bottom - 36 * PX);
-      this.sprite('bin', right - 20 * PX, bottom - 22 * PX);
-    } else if (room === 'pm') {
-      this.sprite('bookshelf', rect.x + 10 * PX, rect.y + 6 * PX);
-      this.sprite('clock', rect.x + rect.w / 2 - 4 * PX, rect.y + 6 * PX);
-      this.sprite('painting', right - 42 * PX, rect.y + 4 * PX);
-      this.sprite('largePlant', right - 38 * PX, bottom - 52 * PX);
-    } else if (room === 'lounge') {
-      this.drawTv(rect.x + rect.w / 2 - 16 * PX, rect.y + 4 * PX);
-      this.sprite('sofa', rect.x + rect.w / 2 - 16 * PX, bottom - 44 * PX);
-      this.sprite('coffeeTable', rect.x + rect.w / 2 - 16 * PX, bottom - 30 * PX);
-      this.sprite('largePlant', rect.x + 8 * PX, bottom - 52 * PX);
-      this.sprite('coffee', right - 24 * PX, bottom - 24 * PX);
+      // test laboratuvarı: cihaz tezgâhı (yan yana PC'ler) + kontrol listesi tahtası
+      s('whiteboard', W - 44, -2);
+      s('clock', 8, 0);
+      s('bigTable', 96, 104);
+      s('pcBack', 100, 88);
+      s('pcBack', 118, 88);
+      s('pcBack', 136, 88);
+      s('cactus', 10, H - 38);
+      s('bin', W - 22, H - 20);
+      s('pot', W - 44, H - 22);
     } else if (room === 'handoff') {
-      this.sprite('smallTable', rect.x + 12 * PX, bottom - 34 * PX);
-      for (let i = 0; i < 3; i++) {
-        const bx = rect.x + 14 * PX + i * 14 * PX;
-        this.p(bx, bottom - 44 * PX, 11 * PX, 8 * PX, '#c8b088');
-        this.p(bx, bottom - 46 * PX, 11 * PX, 3 * PX, '#e0cba4');
-      }
-      this.sprite('smallPainting', right - 26 * PX, rect.y + 6 * PX);
-      this.sprite('plant', right - 22 * PX, bottom - 30 * PX);
+      // teslim/sevkiyat: raflar, paketleme masası, yerde istiflenmiş kutular
+      s('bookshelf2', 10, 4);
+      s('bookshelf2', 46, 4);
+      s('smallTable', 104, 84);
+      box(108, 74, 12, 9);
+      box(122, 76, 10, 8);
+      s('smallPainting', W - 26, 2);
+      for (let i = 0; i < 4; i++) box(14 + i * 15, H - 30, 12, 9);
+      for (let i = 0; i < 3; i++) box(18 + i * 15, H - 40, 12, 9);
+      s('plant', W - 24, H - 34);
+      s('bin', W - 48, H - 20);
     } else if (room === 'waiting') {
-      this.sprite('bench', rect.x + 12 * PX, bottom - 30 * PX);
-      this.sprite('clock', right - 20 * PX, rect.y + 6 * PX);
-      this.sprite('smallTable', right - 44 * PX, bottom - 32 * PX);
-      this.sprite('plant', rect.x + rect.w / 2, bottom - 30 * PX);
+      // bekleme salonu: bank sırası, sehpa, sıra numarası ekranı, su sebili
+      for (let i = 0; i < 5; i++) s('bench', 26 + i * 26, 122);
+      s('coffeeTable', W - 62, 96);
+      s('coffee', W - 54, 92);
+      s('clock', W - 22, 0);
+      s('hangingPlant', 14, 0);
+      // sıra numarası ekranı
+      this.p(rect.x + 82 * PX, rect.y + 6 * PX, 34 * PX, 14 * PX, '#241a14');
+      this.p(rect.x + 84 * PX, rect.y + 8 * PX, 30 * PX, 10 * PX, '#3a2418');
+      ctx.font = `bold ${8 * PX}px ui-monospace, Menlo, monospace`;
+      ctx.fillStyle = Math.sin(this.tick * 0.06) > 0 ? '#fb923c' : '#7c3d18';
+      ctx.textAlign = 'center';
+      ctx.fillText('SIRA', rect.x + 99 * PX, rect.y + 16 * PX);
+      // su sebili
+      this.p(rect.x + 10 * PX, rect.y + H * PX - 34 * PX, 10 * PX, 16 * PX, '#cfd6e4');
+      this.p(rect.x + 10 * PX, rect.y + H * PX - 42 * PX, 10 * PX, 9 * PX, '#7fb6d9');
+      s('plant2', W - 24, H - 36);
+    } else if (room === 'lounge') {
+      // dinlenme: duvarda TV, karşısında koltuk takımı, sehpa, mutfak köşesi
+      this.drawTv(rect.x + (W / 2 - 22) * PX, rect.y + 0 * PX);
+      s('sofa', W / 2 - 16, 128);
+      s('sofaSide', W / 2 - 34, 108);
+      s('sofaSide', W / 2 + 18, 108);
+      s('coffeeTable', W / 2 - 16, 148);
+      s('coffee', W / 2 - 6, 144);
+      // mutfak tezgâhı
+      this.p(rect.x + 8 * PX, rect.y + (H - 34) * PX, 46 * PX, 18 * PX, '#6b4c30');
+      this.p(rect.x + 8 * PX, rect.y + (H - 36) * PX, 46 * PX, 4 * PX, '#8a6440');
+      this.p(rect.x + 14 * PX, rect.y + (H - 44) * PX, 10 * PX, 9 * PX, '#3c4250');
+      this.p(rect.x + 16 * PX, rect.y + (H - 42) * PX, 6 * PX, 4 * PX, '#d9673f');
+      s('bookshelf', W - 44, 4);
+      s('largePlant', W - 40, H - 56);
+      s('plant', 12, 34);
     }
   }
 
@@ -303,15 +396,22 @@ export class Office {
 
     this.decorate(room, rect);
 
+    // isim levhası: duvar mobilyalarının üstünde kalsın diye kendi zemini var
+    const label = this.labels[room] || room.toUpperCase();
     ctx.font = `bold ${9 * PX}px ui-monospace, Menlo, monospace`;
+    const labelW = ctx.measureText(label).width + 12 * PX;
+    this.p(rect.x, rect.y, labelW, 20 * PX, 'rgba(12,11,18,0.72)');
+    this.p(rect.x, rect.y, 3 * PX, 20 * PX, style.trim);
     ctx.fillStyle = style.trim;
     ctx.textAlign = 'left';
-    ctx.fillText(this.labels[room] || room.toUpperCase(), rect.x + 6 * PX, rect.y + 15 * PX);
+    ctx.fillText(label, rect.x + 7 * PX, rect.y + 14 * PX);
 
     const count = this.roomCounts?.[room] || 0;
+    const countW = 16 * PX;
+    this.p(rect.x + rect.w - countW, rect.y, countW, 20 * PX, 'rgba(12,11,18,0.72)');
     ctx.textAlign = 'right';
-    ctx.fillStyle = count ? '#efedf6' : 'rgba(255,255,255,0.22)';
-    ctx.fillText(String(count), rect.x + rect.w - 6 * PX, rect.y + 15 * PX);
+    ctx.fillStyle = count ? '#efedf6' : 'rgba(255,255,255,0.28)';
+    ctx.fillText(String(count), rect.x + rect.w - 5 * PX, rect.y + 14 * PX);
   }
 
   // ---- people ----
