@@ -73,7 +73,8 @@ Claude Code tasks have three states: `pending`, `in_progress`, `completed`. A de
 - [ ] Drag and drop between columns
 - [x] Per-project agent roster read from `.claude/agents`
 - [ ] Per-project stage configuration (not every team has the same four stages)
-- [x] Alert (and optional desktop notification) when a session is waiting for your answer
+- [x] Alert (and optional desktop notification) when a session asks you a question
+- [x] Mark-all-read, per-alert dismiss and a collapsible bell, all persisted
 - [ ] Cost estimate per project from token buckets
 - [ ] Optional hook mode for sub-second updates instead of 4s polling
 - [ ] Support other agent CLIs that keep local transcripts
