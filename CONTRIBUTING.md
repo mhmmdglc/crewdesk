@@ -5,7 +5,7 @@ Thanks for looking. crewdesk is small on purpose: no build step, no runtime depe
 ## Running it
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/crewdesk.git
+git clone https://github.com/mhmmdglc/crewdesk.git
 cd crewdesk
 node bin/crewdesk.mjs --port 4601
 ```

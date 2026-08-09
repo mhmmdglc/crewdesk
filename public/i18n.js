@@ -1,0 +1,351 @@
+// Dil dosyası. Varsayılan İngilizce; tarayıcı dili tutarsa otomatik seçilir,
+// kullanıcı başlıktaki seçiciyle değiştirirse tercihi saklanır.
+
+export const LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'tr', label: 'Türkçe' },
+  { code: 'es', label: 'Español' },
+  { code: 'zh', label: '简体中文' },
+  { code: 'ja', label: '日本語' },
+  { code: 'de', label: 'Deutsch' },
+];
+
+const STRINGS = {
+  en: {
+    tabBoard: 'Board',
+    tabOffice: 'Office',
+    projects: 'Projects',
+    sessions: (n) => `${n} session${n === 1 ? '' : 's'}`,
+    openWork: (n) => `${n} open`,
+    noWork: 'nothing open',
+    running: (n) => `${n} running`,
+    questions: (n) => `${n} question${n === 1 ? '' : 's'}`,
+    turnsDone: (n) => `${n} turn${n === 1 ? '' : 's'} finished`,
+    fiveHourWindow: '5-hour window',
+    sevenDayWindow: '7-day window',
+    tokens: 'tokens',
+    bucketResets: 'bucket resets',
+    noTokenData: 'no token data',
+    noSessions: 'No sessions in this project in the last 7 days.',
+    stageManager: 'Manager',
+    stageDev: 'Dev',
+    stageTest: 'Test',
+    stageDone: 'Done',
+    empty: 'empty',
+    unassigned: '— unassigned —',
+    testRound: (n) => `test round ${n}`,
+    alertsWaiting: (n) => `${n} question${n === 1 ? '' : 's'} waiting`,
+    alertsNone: 'no new questions',
+    markAllRead: 'mark all read',
+    hide: 'hide',
+    markRead: 'mark read',
+    moreQuestions: (n) => `+${n} more`,
+    turnsIdle: (n) => `${n} chat${n === 1 ? '' : 's'} finished a turn — your move`,
+    notifyTitle: (project) => `${project} — you were asked a question`,
+    ago: 'ago',
+    footer: (projects, agents) => `${projects} projects · ${agents} agents running · reading ~/.claude (read-only)`,
+    roomPm: 'PM OFFICE',
+    roomWork: 'WORK ROOM',
+    roomTest: 'TEST ROOM',
+    roomHandoff: 'HANDOFF',
+    roomWaiting: 'WAITING ROOM',
+    roomLounge: 'LOUNGE',
+    hasQuestion: 'ASKED YOU',
+    queueDisplay: 'QUEUE',
+    noCrew: 'no agents defined and no open session in this project',
+    liveCrew: 'CREW',
+    officeHint: 'Every character is an <b>agent</b>; the room shows what it is doing right now. '
+      + 'The label above its head is the task in hand, the purple number on its shoulder is its queue, '
+      + 'the coloured line underneath is its role. Only an agent that is actually running enters the work '
+      + 'or test room — one with a backlog but no running process waits in the lounge. Anything blocked on '
+      + 'you drops into the waiting room, finished work is left in the handoff room. ↺ counts test rounds. '
+      + 'Assign work from the cards on the Board tab.',
+    seconds: 's', minutes: 'm', hours: 'h',
+  },
+
+  tr: {
+    tabBoard: 'Tahta',
+    tabOffice: 'Ofis',
+    projects: 'Projeler',
+    sessions: (n) => `${n} oturum`,
+    openWork: (n) => `${n} açık iş`,
+    noWork: 'iş yok',
+    running: (n) => `${n} çalışıyor`,
+    questions: (n) => `${n} soru`,
+    turnsDone: (n) => `${n} tur bitti`,
+    fiveHourWindow: '5 saatlik pencere',
+    sevenDayWindow: '7 günlük pencere',
+    tokens: 'token',
+    bucketResets: 'kova yenilenme',
+    noTokenData: 'token verisi yok',
+    noSessions: 'Bu projede son 7 günde oturum yok.',
+    stageManager: 'Manager',
+    stageDev: 'Geliştirme',
+    stageTest: 'Test',
+    stageDone: 'Bitti',
+    empty: 'boş',
+    unassigned: '— kimseye atanmadı —',
+    testRound: (n) => `${n}. test turu`,
+    alertsWaiting: (n) => `${n} soru bekliyor`,
+    alertsNone: 'yeni soru yok',
+    markAllRead: 'tümünü okundu',
+    hide: 'gizle',
+    markRead: 'okundu',
+    moreQuestions: (n) => `+${n} soru daha`,
+    turnsIdle: (n) => `${n} sohbet turunu bitirmiş, sırada sen varsın`,
+    notifyTitle: (project) => `${project} — sana soru soruldu`,
+    ago: 'önce',
+    footer: (projects, agents) => `${projects} proje · ${agents} ajan çalışıyor · veri kaynağı ~/.claude (salt okunur)`,
+    roomPm: 'PM ODASI',
+    roomWork: 'ÇALIŞMA ODASI',
+    roomTest: 'TEST ODASI',
+    roomHandoff: 'TESLİM ODASI',
+    roomWaiting: 'BEKLEME ODASI',
+    roomLounge: 'DİNLENME ODASI',
+    hasQuestion: 'SORU VAR',
+    queueDisplay: 'SIRA',
+    noCrew: 'bu projede tanımlı ajan ve açık oturum yok',
+    liveCrew: 'TAKIM',
+    officeHint: 'Her karakter bir <b>ajandır</b>, odalar o an ne yaptığını gösterir. '
+      + 'Başının üstündeki etiket elindeki iş, omzundaki mor sayı kuyruğundaki iş adedi, '
+      + 'altındaki renk çizgisi rolünün rengi. Çalışma ve test odasına yalnızca gerçekten koşan ajan girer; '
+      + 'kuyruğu olup çalışmayan dinlenme odasında bekler. Senin onayını bekleyen bekleme odasına düşer, '
+      + 'biten iş teslim odasına bırakılır. ↺ kaçıncı test turu olduğunu söyler. '
+      + 'Atamayı Tahta sekmesindeki kartlardan yaparsın.',
+    seconds: 'sn', minutes: 'dk', hours: 'sa',
+  },
+
+  es: {
+    tabBoard: 'Tablero',
+    tabOffice: 'Oficina',
+    projects: 'Proyectos',
+    sessions: (n) => `${n} sesión${n === 1 ? '' : 'es'}`,
+    openWork: (n) => `${n} abierto${n === 1 ? '' : 's'}`,
+    noWork: 'nada abierto',
+    running: (n) => `${n} en ejecución`,
+    questions: (n) => `${n} pregunta${n === 1 ? '' : 's'}`,
+    turnsDone: (n) => `${n} turno${n === 1 ? '' : 's'} terminado${n === 1 ? '' : 's'}`,
+    fiveHourWindow: 'ventana de 5 horas',
+    sevenDayWindow: 'ventana de 7 días',
+    tokens: 'tokens',
+    bucketResets: 'reinicio del bloque',
+    noTokenData: 'sin datos de tokens',
+    noSessions: 'Sin sesiones en este proyecto en los últimos 7 días.',
+    stageManager: 'Manager',
+    stageDev: 'Desarrollo',
+    stageTest: 'Pruebas',
+    stageDone: 'Hecho',
+    empty: 'vacío',
+    unassigned: '— sin asignar —',
+    testRound: (n) => `ronda de pruebas ${n}`,
+    alertsWaiting: (n) => `${n} pregunta${n === 1 ? '' : 's'} esperando`,
+    alertsNone: 'sin preguntas nuevas',
+    markAllRead: 'marcar todo leído',
+    hide: 'ocultar',
+    markRead: 'leído',
+    moreQuestions: (n) => `+${n} más`,
+    turnsIdle: (n) => `${n} chat${n === 1 ? '' : 's'} terminó su turno — te toca`,
+    notifyTitle: (project) => `${project} — te han hecho una pregunta`,
+    ago: 'atrás',
+    footer: (projects, agents) => `${projects} proyectos · ${agents} agentes en ejecución · leyendo ~/.claude (solo lectura)`,
+    roomPm: 'OFICINA PM',
+    roomWork: 'SALA DE TRABAJO',
+    roomTest: 'SALA DE PRUEBAS',
+    roomHandoff: 'ENTREGAS',
+    roomWaiting: 'SALA DE ESPERA',
+    roomLounge: 'DESCANSO',
+    hasQuestion: 'TE PREGUNTA',
+    queueDisplay: 'TURNO',
+    noCrew: 'sin agentes definidos ni sesión abierta en este proyecto',
+    liveCrew: 'EQUIPO',
+    officeHint: 'Cada personaje es un <b>agente</b>; la sala muestra lo que hace ahora mismo. '
+      + 'La etiqueta sobre su cabeza es la tarea en mano, el número morado en el hombro es su cola, '
+      + 'la línea de color debajo es su rol. Solo un agente realmente en ejecución entra en la sala de '
+      + 'trabajo o de pruebas; quien tiene cola pero nada corriendo espera en la sala de descanso. '
+      + 'Lo que depende de ti cae en la sala de espera. ↺ cuenta las rondas de pruebas.',
+    seconds: 's', minutes: 'min', hours: 'h',
+  },
+
+  zh: {
+    tabBoard: '看板',
+    tabOffice: '办公室',
+    projects: '项目',
+    sessions: (n) => `${n} 个会话`,
+    openWork: (n) => `${n} 项待办`,
+    noWork: '无待办',
+    running: (n) => `${n} 个运行中`,
+    questions: (n) => `${n} 个问题`,
+    turnsDone: (n) => `${n} 轮已结束`,
+    fiveHourWindow: '5 小时窗口',
+    sevenDayWindow: '7 天窗口',
+    tokens: 'token',
+    bucketResets: '窗口重置',
+    noTokenData: '无 token 数据',
+    noSessions: '该项目最近 7 天没有会话。',
+    stageManager: '待分配',
+    stageDev: '开发中',
+    stageTest: '测试中',
+    stageDone: '已完成',
+    empty: '空',
+    unassigned: '— 未分配 —',
+    testRound: (n) => `第 ${n} 轮测试`,
+    alertsWaiting: (n) => `${n} 个问题等待答复`,
+    alertsNone: '没有新问题',
+    markAllRead: '全部标记已读',
+    hide: '隐藏',
+    markRead: '已读',
+    moreQuestions: (n) => `还有 ${n} 个`,
+    turnsIdle: (n) => `${n} 个会话已结束本轮，轮到你了`,
+    notifyTitle: (project) => `${project} — 有问题等你回答`,
+    ago: '前',
+    footer: (projects, agents) => `${projects} 个项目 · ${agents} 个代理运行中 · 读取 ~/.claude（只读）`,
+    roomPm: '项目经理室',
+    roomWork: '工作室',
+    roomTest: '测试室',
+    roomHandoff: '交付室',
+    roomWaiting: '等候室',
+    roomLounge: '休息室',
+    hasQuestion: '等你答复',
+    queueDisplay: '排队',
+    noCrew: '该项目未定义代理，也没有打开的会话',
+    liveCrew: '团队',
+    officeHint: '每个角色都是一个<b>代理</b>，房间表示它此刻在做什么。'
+      + '头顶标签是手上的任务，肩上的紫色数字是队列长度，下方色条是角色颜色。'
+      + '只有真正在运行的代理才会进入工作室或测试室；有积压但没有运行进程的代理在休息室等待。'
+      + '需要你处理的会进入等候室，完成的工作留在交付室。↺ 表示第几轮测试。',
+    seconds: '秒', minutes: '分', hours: '小时',
+  },
+
+  ja: {
+    tabBoard: 'ボード',
+    tabOffice: 'オフィス',
+    projects: 'プロジェクト',
+    sessions: (n) => `${n} セッション`,
+    openWork: (n) => `未完了 ${n} 件`,
+    noWork: '作業なし',
+    running: (n) => `実行中 ${n}`,
+    questions: (n) => `質問 ${n} 件`,
+    turnsDone: (n) => `${n} 件のターンが終了`,
+    fiveHourWindow: '5時間ウィンドウ',
+    sevenDayWindow: '7日ウィンドウ',
+    tokens: 'トークン',
+    bucketResets: 'バケットのリセット',
+    noTokenData: 'トークンデータなし',
+    noSessions: 'このプロジェクトには過去7日間のセッションがありません。',
+    stageManager: 'マネージャー',
+    stageDev: '開発',
+    stageTest: 'テスト',
+    stageDone: '完了',
+    empty: '空',
+    unassigned: '— 未割当 —',
+    testRound: (n) => `テスト ${n} 回目`,
+    alertsWaiting: (n) => `${n} 件の質問が待機中`,
+    alertsNone: '新しい質問はありません',
+    markAllRead: 'すべて既読',
+    hide: '非表示',
+    markRead: '既読',
+    moreQuestions: (n) => `他 ${n} 件`,
+    turnsIdle: (n) => `${n} 件のチャットがターンを終えました — あなたの番です`,
+    notifyTitle: (project) => `${project} — 質問があります`,
+    ago: '前',
+    footer: (projects, agents) => `${projects} プロジェクト · ${agents} エージェント実行中 · ~/.claude を読み取り（読み取り専用）`,
+    roomPm: 'PM ルーム',
+    roomWork: 'ワークルーム',
+    roomTest: 'テストルーム',
+    roomHandoff: '受け渡し',
+    roomWaiting: '待合室',
+    roomLounge: 'ラウンジ',
+    hasQuestion: '質問あり',
+    queueDisplay: '順番',
+    noCrew: 'このプロジェクトにはエージェント定義も開いているセッションもありません',
+    liveCrew: 'チーム',
+    officeHint: '各キャラクターは<b>エージェント</b>で、部屋は今なにをしているかを表します。'
+      + '頭上のラベルは担当タスク、肩の紫の数字はキューの数、下の色の線は役割の色です。'
+      + '実際に実行中のエージェントだけがワークルームとテストルームに入ります。'
+      + 'キューがあっても実行していないエージェントはラウンジで待ちます。'
+      + 'あなた待ちのものは待合室へ、完了した作業は受け渡しへ。↺ はテストの回数です。',
+    seconds: '秒', minutes: '分', hours: '時間',
+  },
+
+  de: {
+    tabBoard: 'Board',
+    tabOffice: 'Büro',
+    projects: 'Projekte',
+    sessions: (n) => `${n} Sitzung${n === 1 ? '' : 'en'}`,
+    openWork: (n) => `${n} offen`,
+    noWork: 'nichts offen',
+    running: (n) => `${n} laufen`,
+    questions: (n) => `${n} Frage${n === 1 ? '' : 'n'}`,
+    turnsDone: (n) => `${n} Runde${n === 1 ? '' : 'n'} beendet`,
+    fiveHourWindow: '5-Stunden-Fenster',
+    sevenDayWindow: '7-Tage-Fenster',
+    tokens: 'Tokens',
+    bucketResets: 'Fenster erneuert',
+    noTokenData: 'keine Token-Daten',
+    noSessions: 'Keine Sitzungen in diesem Projekt in den letzten 7 Tagen.',
+    stageManager: 'Manager',
+    stageDev: 'Entwicklung',
+    stageTest: 'Test',
+    stageDone: 'Fertig',
+    empty: 'leer',
+    unassigned: '— nicht zugewiesen —',
+    testRound: (n) => `Testrunde ${n}`,
+    alertsWaiting: (n) => `${n} Frage${n === 1 ? '' : 'n'} wartet`,
+    alertsNone: 'keine neuen Fragen',
+    markAllRead: 'alle gelesen',
+    hide: 'ausblenden',
+    markRead: 'gelesen',
+    moreQuestions: (n) => `+${n} weitere`,
+    turnsIdle: (n) => `${n} Chat${n === 1 ? '' : 's'} hat die Runde beendet — du bist dran`,
+    notifyTitle: (project) => `${project} — du wurdest gefragt`,
+    ago: 'her',
+    footer: (projects, agents) => `${projects} Projekte · ${agents} Agenten laufen · liest ~/.claude (nur lesend)`,
+    roomPm: 'PM-BÜRO',
+    roomWork: 'ARBEITSRAUM',
+    roomTest: 'TESTRAUM',
+    roomHandoff: 'ÜBERGABE',
+    roomWaiting: 'WARTERAUM',
+    roomLounge: 'AUFENTHALTSRAUM',
+    hasQuestion: 'FRAGT DICH',
+    queueDisplay: 'WARTEN',
+    noCrew: 'keine Agenten definiert und keine offene Sitzung in diesem Projekt',
+    liveCrew: 'TEAM',
+    officeHint: 'Jede Figur ist ein <b>Agent</b>; der Raum zeigt, was sie gerade tut. '
+      + 'Das Schild über dem Kopf ist die aktuelle Aufgabe, die violette Zahl an der Schulter die Warteschlange, '
+      + 'die farbige Linie darunter die Rolle. Nur ein tatsächlich laufender Agent betritt Arbeits- oder Testraum; '
+      + 'wer einen Rückstand, aber keinen laufenden Prozess hat, wartet im Aufenthaltsraum. '
+      + 'Was auf dich wartet, landet im Warteraum. ↺ zählt die Testrunden.',
+    seconds: 's', minutes: 'min', hours: 'Std',
+  },
+};
+
+const STORE_KEY = 'crewdesk:lang';
+
+function detect() {
+  const saved = localStorage.getItem(STORE_KEY);
+  if (saved && STRINGS[saved]) return saved;
+  for (const tag of navigator.languages || [navigator.language || 'en']) {
+    const code = String(tag).toLowerCase().split('-')[0];
+    if (STRINGS[code]) return code;
+  }
+  return 'en';
+}
+
+let current = detect();
+
+export function lang() {
+  return current;
+}
+
+export function setLang(code) {
+  if (!STRINGS[code]) return;
+  current = code;
+  localStorage.setItem(STORE_KEY, code);
+}
+
+// t('openWork', 3) → "3 open"   ·   eksik anahtar İngilizceye düşer
+export function t(key, ...args) {
+  const value = STRINGS[current]?.[key] ?? STRINGS.en[key];
+  if (value === undefined) return key;
+  return typeof value === 'function' ? value(...args) : value;
+}

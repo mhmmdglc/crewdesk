@@ -4,6 +4,8 @@
 // Art: character sprites CC0 (MetroCity, JIK-A-4). Furniture/floor/carpet sprites MIT
 // (Pixel Agents, Pablo De Lucca) — see LICENSE-THIRD-PARTY.
 
+import { t } from './i18n.js';
+
 const PX = 2;
 const VW = 660 * PX;
 const VH = 380 * PX;
@@ -14,6 +16,11 @@ const WALL_H = 26 * PX;
 const SPRITE_COUNT = 6;
 const FRAME_W = 16;
 const FRAME_H = 32;
+
+const ROOM_KEY = {
+  pm: 'roomPm', work: 'roomWork', test: 'roomTest',
+  handoff: 'roomHandoff', waiting: 'roomWaiting', lounge: 'roomLounge',
+};
 
 const GRID = [
   ['pm', 'work', 'test'],
@@ -209,6 +216,8 @@ export class Office {
 
   stop() { this.running = false; }
 
+  invalidate() { this.tick += 1; }
+
   p(x, y, w, h, color) {
     this.ctx.fillStyle = color;
     this.ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
@@ -385,7 +394,7 @@ export class Office {
       ctx.font = `bold ${8 * PX}px ui-monospace, Menlo, monospace`;
       ctx.fillStyle = Math.sin(this.tick * 0.06) > 0 ? '#fb923c' : '#7c3d18';
       ctx.textAlign = 'center';
-      ctx.fillText('SIRA', rect.x + 99 * PX, rect.y + 16 * PX);
+      ctx.fillText(t('queueDisplay'), rect.x + 99 * PX, rect.y + 16 * PX);
       // su sebili
       this.p(rect.x + 10 * PX, rect.y + H * PX - 34 * PX, 10 * PX, 16 * PX, '#cfd6e4');
       this.p(rect.x + 10 * PX, rect.y + H * PX - 42 * PX, 10 * PX, 9 * PX, '#7fb6d9');
@@ -425,7 +434,7 @@ export class Office {
     this.decorate(room, rect);
 
     // isim levhası: duvar mobilyalarının üstünde kalsın diye kendi zemini var
-    const label = this.labels[room] || room.toUpperCase();
+    const label = t(ROOM_KEY[room]) || room.toUpperCase();
     ctx.font = `bold ${9 * PX}px ui-monospace, Menlo, monospace`;
     const labelW = ctx.measureText(label).width + 12 * PX;
     this.p(rect.x, rect.y, labelW, 20 * PX, 'rgba(12,11,18,0.72)');
@@ -516,7 +525,7 @@ export class Office {
         this.tag(p.x + 8 * PX, p.y - 38 * PX, p.tool.slice(0, 22), 'rgba(14,13,20,0.92)', '#4ade80');
       }
       if (p.waiting) {
-        this.tag(p.x + 8 * PX, p.y - 26 * PX, 'SORU VAR', '#7c2d12', '#fed7aa');
+        this.tag(p.x + 8 * PX, p.y - 26 * PX, t('hasQuestion'), '#7c2d12', '#fed7aa');
       }
 
       ctx.font = `${7 * PX}px ui-monospace, Menlo, monospace`;

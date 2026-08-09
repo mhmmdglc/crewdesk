@@ -127,22 +127,30 @@
     box-shadow: 0 6px 18px rgba(0,0,0,.4);
   }
   .bell:hover { border-color: #fb923c; color: #fff; }
+  select.lang {
+    background: var(--panel-2); color: var(--dim); border: 1px solid var(--line);
+    border-radius: 8px; padding: 3px 6px; font-size: 11px;
+  }
+  select.lang:hover { border-color: var(--accent); color: var(--text); }
 </style>
 </head>
 <body>
 <header>
   <div class="brand">crewdesk</div>
   <div class="tabs">
-    <button id="tabBoard" class="on">Tahta</button>
-    <button id="tabOffice">Ofis</button>
+    <button id="tabBoard" class="on"></button>
+    <button id="tabOffice"></button>
   </div>
   <div class="meters" id="meters"></div>
-  <div style="margin-left:auto" class="pill" id="clock"></div>
+  <div style="margin-left:auto; display:flex; gap:8px; align-items:center">
+    <select id="langSelect" class="lang" aria-label="language"></select>
+    <span class="pill" id="clock"></span>
+  </div>
 </header>
 
 <main>
   <aside>
-    <h2>Projeler</h2>
+    <h2 id="projectsHeading"></h2>
     <div id="projects"></div>
   </aside>
   <section>
@@ -152,14 +160,7 @@
     </div>
     <div id="officeView" hidden>
       <canvas id="officeCanvas"></canvas>
-      <div class="hint">
-        Her karakter bir <b>ajandır</b>, odalar o an ne yaptığını gösterir.
-        Başının üstündeki etiket elindeki iş, omzundaki mor sayı kuyruğundaki iş adedi,
-        altındaki renk çizgisi rolünün rengi. Çalışma ve test odasına yalnızca gerçekten
-        koşan ajan girer; kuyruğu olup çalışmayan dinlenme odasında bekler.
-        Senin onayını bekleyen bekleme odasına düşer, biten iş teslim odasına bırakılır.
-        ↺ kaçıncı test turu olduğunu söyler. Atamayı Tahta sekmesindeki kartlardan yaparsın.
-      </div>
+      <div class="hint" id="officeHint"></div>
     </div>
   </section>
 </main>

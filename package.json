@@ -39,6 +39,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/USER/crewdesk.git"
-  }
+    "url": "git+https://github.com/mhmmdglc/crewdesk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mhmmdglc/crewdesk/issues"
+  },
+  "homepage": "https://github.com/mhmmdglc/crewdesk#readme",
+  "author": "mhmmdglc"
 }

@@ -1,6 +1,7 @@
 import { Office } from './office.js';
+import { t, lang, setLang, LANGUAGES } from './i18n.js';
 
-const STAGE_LABEL = { manager: 'Manager', dev: 'Geliştirme', test: 'Test', done: 'Bitti' };
+const stageLabel = (s) => t({ manager: 'stageManager', dev: 'stageDev', test: 'stageTest', done: 'stageDone' }[s] || s);
 
 let selected = null;
 let state = null;
@@ -17,9 +18,9 @@ const fmt = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.r
 
 const ago = (ts) => {
   const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
-  if (s < 60) return `${s}sn`;
-  if (s < 3600) return `${Math.round(s / 60)}dk`;
-  return `${Math.round(s / 3600)}sa`;
+  if (s < 60) return `${s}${t('seconds')}`;
+  if (s < 3600) return `${Math.round(s / 60)}${t('minutes')}`;
+  return `${Math.round(s / 3600)}${t('hours')}`;
 };
 
 const realQuestions = (p) => (p.questions || []).filter((q) => q.isQuestion && q.fresh);
@@ -33,16 +34,16 @@ function meter(label, value, pct) {
 }
 
 function meters(tokens) {
-  if (!tokens.available) return '<span class="pill">token verisi yok</span>';
+  if (!tokens.available) return `<span class="pill">${t('noTokenData')}</span>`;
   const gauges = (tokens.gauges || []).map((g) => {
     const pct = Math.min(100, Math.round((g.used / g.limit) * 100));
     return meter(g.label || 'limit', `${pct}%`, pct);
   }).join('');
   const reset = new Date(tokens.windowResetsAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-  return `${meter('5 saatlik pencere', `${fmt(tokens.fiveHour)} token`, null)}
-    ${meter('7 günlük pencere', `${fmt(tokens.sevenDay)} token`, null)}
+  return `${meter(t('fiveHourWindow'), `${fmt(tokens.fiveHour)} ${t('tokens')}`, null)}
+    ${meter(t('sevenDayWindow'), `${fmt(tokens.sevenDay)} ${t('tokens')}`, null)}
     ${gauges}
-    <span class="pill">kova yenilenme ${esc(reset)}</span>`;
+    <span class="pill">${t('bucketResets')} ${esc(reset)}</span>`;
 }
 
 function renderProjects() {
@@ -54,14 +55,14 @@ function renderProjects() {
     return `<button class="proj ${p.id === selected ? 'sel' : ''}" data-id="${esc(p.id)}">
       <div class="top">
         <span class="name"><span class="dot ${status}"></span> ${esc(p.name)}</span>
-        <span class="pill">${p.sessions.length} oturum</span>
+        <span class="pill">${t('sessions', p.sessions.length)}</span>
       </div>
       <div class="path">${esc(p.path)}</div>
       <div class="badges" style="margin-top:6px">
-        ${open ? `<span class="badge">${open} açık iş</span>` : '<span class="badge">iş yok</span>'}
-        ${p.activeCount ? `<span class="badge" style="color:var(--active)">${p.activeCount} çalışıyor</span>` : ''}
-        ${asks ? `<span class="badge q">❓ ${asks} soru</span>` : ''}
-        ${idle ? `<span class="badge">${idle} tur bitti</span>` : ''}
+        ${open ? `<span class="badge">${t('openWork', open)}</span>` : `<span class="badge">${t('noWork')}</span>`}
+        ${p.activeCount ? `<span class="badge" style="color:var(--active)">${t('running', p.activeCount)}</span>` : ''}
+        ${asks ? `<span class="badge q">❓ ${t('questions', asks)}</span>` : ''}
+        ${idle ? `<span class="badge">${t('turnsDone', idle)}</span>` : ''}
       </div>
     </button>`;
   }).join('');
@@ -77,34 +78,34 @@ function renderSessions(project) {
       <div class="row"><span class="dot ${s.status}"></span>
         <span class="title">${esc(s.title || s.sessionId.slice(0, 8))}</span></div>
       ${s.lastTool ? `<div class="tool">▸ ${esc(s.lastTool)}</div>` : ''}
-      <div class="meta">${esc(s.gitBranch || '—')} · ${ago(s.lastActivity)} önce · ${fmt(s.tokensFiveHour)} tok/5sa</div>
+      <div class="meta">${esc(s.gitBranch || '—')} · ${ago(s.lastActivity)} ${t('ago')} · ${fmt(s.tokensFiveHour)} ${t('tokens')}/5h</div>
       ${s.subagents.map((a) => `<div class="sub">└ ${esc(a.name)}${a.lastTool ? ` · ${esc(a.lastTool)}` : ''}</div>`).join('')}
-    </div>`).join('') || '<div class="empty">Bu projede son 7 günde oturum yok.</div>';
+    </div>`).join('') || `<div class="empty">${t('noSessions')}</div>`;
 }
 
 function renderColumns(project) {
   document.getElementById('cols').innerHTML = state.stages.map((stage) => {
     const cards = project.tasks.filter((t) => t.stage === stage);
     return `<div class="col">
-      <h3><span>${esc(STAGE_LABEL[stage] || stage)}</span><span>${cards.length}</span></h3>
-      ${cards.map((t) => `
+      <h3><span>${esc(stageLabel(stage))}</span><span>${cards.length}</span></h3>
+      ${cards.map((task) => `
         <div class="card">
-          <div class="subject">${esc(t.subject)}</div>
+          <div class="subject">${esc(task.subject)}</div>
           <div class="badges">
-            ${t.owner ? `<span class="badge owner">${esc(t.owner)}</span>` : ''}
-            ${t.testRounds ? `<span class="badge rounds">${t.testRounds}. test turu</span>` : ''}
-            <span class="badge">#${esc(t.id)}</span>
+            ${task.owner ? `<span class="badge owner">${esc(task.owner)}</span>` : ''}
+            ${task.testRounds ? `<span class="badge rounds">${esc(t('testRound', task.testRounds))}</span>` : ''}
+            <span class="badge">#${esc(task.id)}</span>
           </div>
           <div class="move">
-            ${state.stages.map((s) => `<button data-key="${esc(t.key)}" data-stage="${esc(s)}"
-              class="${s === t.stage ? 'on' : ''}">${esc(STAGE_LABEL[s] || s)}</button>`).join('')}
+            ${state.stages.map((s) => `<button data-key="${esc(task.key)}" data-stage="${esc(s)}"
+              class="${s === task.stage ? 'on' : ''}">${esc(stageLabel(s))}</button>`).join('')}
           </div>
-          <select class="assign" data-key="${esc(t.key)}" data-from="${esc(t.owner || '')}">
-            <option value="">— kimseye atanmadı —</option>
+          <select class="assign" data-key="${esc(task.key)}" data-from="${esc(task.owner || '')}">
+            <option value="">${esc(t('unassigned'))}</option>
             ${(project.crew || []).filter((a) => a.kind === 'agent').map((a) => `<option value="${esc(a.name)}"
-              ${a.name === t.owner ? 'selected' : ''}>${esc(a.name)}${a.queue ? ` (${a.queue})` : ''}</option>`).join('')}
+              ${a.name === task.owner ? 'selected' : ''}>${esc(a.name)}${a.queue ? ` (${a.queue})` : ''}</option>`).join('')}
           </select>
-        </div>`).join('') || '<div class="empty">boş</div>'}
+        </div>`).join('') || `<div class="empty">${esc(t('empty'))}</div>`}
     </div>`;
   }).join('');
 
@@ -172,7 +173,7 @@ function renderAlerts() {
   }
 
   if (alertsHidden) {
-    box.innerHTML = `<button class="bell" id="alertsShow">🔔 ${asks.length ? `${asks.length} soru` : `${idle} tur bitti`}</button>`;
+    box.innerHTML = `<button class="bell" id="alertsShow">🔔 ${esc(asks.length ? t('questions', asks.length) : t('turnsDone', idle))}</button>`;
     document.getElementById('alertsShow').onclick = () => {
       alertsHidden = false;
       localStorage.removeItem(HIDE_KEY);
@@ -187,22 +188,22 @@ function renderAlerts() {
 
   box.innerHTML = `
     <div class="alert-head">
-      <span>${asks.length ? `❓ ${asks.length} soru bekliyor` : 'yeni soru yok'}</span>
+      <span>${asks.length ? `❓ ${esc(t('alertsWaiting', asks.length))}` : esc(t('alertsNone'))}</span>
       <span>
-        ${asks.length ? '<button id="markAll">tümünü okundu</button>' : ''}
-        <button id="hideAlerts" title="gizle">gizle</button>
+        ${asks.length ? `<button id="markAll">${esc(t('markAllRead'))}</button>` : ''}
+        <button id="hideAlerts" title="${esc(t('hide'))}">${esc(t('hide'))}</button>
       </span>
     </div>
     ${shown.map((q) => `
       <div class="alert" data-project="${esc(q.project)}" data-key="${esc(alertKey(q))}">
         <div class="who">
           <span>❓ ${esc(q.projectName)}</span>
-          <span>${ago(q.since)} önce <b class="x" title="okundu">×</b></span>
+          <span>${ago(q.since)} ${t('ago')} <b class="x" title="${t('markRead')}">×</b></span>
         </div>
         <div class="txt">${esc(q.text)}</div>
       </div>`).join('')}
-    ${rest > 0 ? `<div class="alert more">+${rest} soru daha</div>` : ''}
-    ${idle > 0 ? `<div class="alert quiet">${idle} sohbet turunu bitirmiş, sırada sen varsın</div>` : ''}`;
+    ${rest > 0 ? `<div class="alert more">${t('moreQuestions', rest)}</div>` : ''}
+    ${idle > 0 ? `<div class="alert quiet">${t('turnsIdle', idle)}</div>` : ''}`;
 
   document.getElementById('hideAlerts').onclick = () => {
     alertsHidden = true;
@@ -239,7 +240,7 @@ function renderAlerts() {
     if (notified.has(key)) continue;
     notified.add(key);
     if (window.Notification?.permission === 'granted') {
-      new Notification(`${q.projectName} — sana soru soruldu`, { body: q.text.slice(0, 140) });
+      new Notification(t('notifyTitle', q.projectName), { body: q.text.slice(0, 140) });
     }
   }
 }
@@ -258,8 +259,7 @@ function render() {
   renderColumns(project);
   office.update(project, state.roomLabels);
   const totalActive = state.projects.reduce((n, p) => n + p.activeCount, 0);
-  document.getElementById('footer').textContent =
-    `${state.projects.length} proje · ${totalActive} ajan çalışıyor · veri kaynağı ~/.claude (salt okunur)`;
+  document.getElementById('footer').textContent = t('footer', state.projects.length, totalActive);
 }
 
 function setView(next) {
@@ -278,6 +278,32 @@ async function load() {
   render();
   renderAlerts();
 }
+
+// ---- dil ----
+
+function applyStaticStrings() {
+  document.documentElement.lang = lang();
+  document.getElementById('tabBoard').textContent = t('tabBoard');
+  document.getElementById('tabOffice').textContent = t('tabOffice');
+  document.getElementById('projectsHeading').textContent = t('projects');
+  document.getElementById('officeHint').innerHTML = t('officeHint');
+}
+
+function mountLanguagePicker() {
+  const select = document.getElementById('langSelect');
+  select.innerHTML = LANGUAGES.map((l) => `<option value="${l.code}"
+    ${l.code === lang() ? 'selected' : ''}>${l.label}</option>`).join('');
+  select.onchange = () => {
+    setLang(select.value);
+    applyStaticStrings();
+    alertSignature = '';
+    office.invalidate?.();
+    if (state) { render(); renderAlerts(); }
+  };
+}
+
+mountLanguagePicker();
+applyStaticStrings();
 
 document.getElementById('tabBoard').onclick = () => setView('board');
 document.getElementById('tabOffice').onclick = () => setView('office');
