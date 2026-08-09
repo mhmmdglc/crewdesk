@@ -17,7 +17,8 @@
   "scripts": {
     "start": "node bin/crewdesk.mjs",
     "dev": "node bin/crewdesk.mjs --port 4601",
-    "check": "node --check src/server.mjs && node --check src/sources.mjs && node --check src/events.mjs && node --check src/board.mjs && node --check bin/crewdesk.mjs && node --check public/office.js && node --check public/app.js"
+    "check": "node --check src/server.mjs && node --check src/sources.mjs && node --check src/events.mjs && node --check src/board.mjs && node --check bin/crewdesk.mjs && node --check public/office.js && node --check public/app.js",
+    "demo": "node demo/run.mjs"
   },
   "engines": {
     "node": ">=20"

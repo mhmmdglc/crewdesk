@@ -18,6 +18,10 @@
   <img alt="runtime dependencies" src="https://img.shields.io/badge/runtime%20deps-0-brightgreen">
 </p>
 
+<p align="center">
+  <img src="docs/office.gif" alt="crewdesk pixel office: agents move between the PM office, work room, test room, handoff, waiting room and lounge" width="880">
+</p>
+
 ---
 
 You have Claude Code running in four repos at once. One of them is waiting on an answer you never saw. Another burned half your weekly token budget an hour ago. A third finished twenty minutes ago and has been idle since.
@@ -35,6 +39,10 @@ npx crewdesk
 ```
 
 Then open **http://127.0.0.1:4600**. That's it — no config file, no setup wizard.
+
+Want to see it full before pointing it at your own work? `npm run demo` builds a throwaway
+`~/.claude` tree of invented projects under your temp directory and serves that instead —
+your real data is never read. Every screenshot on this page is that demo.
 
 Global install, if you'd rather have the command around:
 
@@ -67,11 +75,15 @@ Every project Claude Code has touched in the last 7 days, newest activity first.
 
 ### Board tab
 
+<img src="docs/board.png" alt="crewdesk board: projects sidebar, Manager/Dev/Test/Done columns, token windows and a question alert" width="100%">
+
 Work items in four columns — **Manager → Dev → Test → Done**. Click a stage to move a card; pick an owner from the dropdown to assign it to one of that project's agents.
 
 Moving a card *backwards out of Test* increments its test-round counter, so a card that has bounced twice wears a `↺2` badge. That single number answers a question a plain kanban never can: *is this thing actually converging?*
 
 ### Office tab
+
+<img src="docs/office.png" alt="crewdesk office: frontend-dev running in the work room, qa-tester on test round 2, idle agents in the lounge" width="100%">
 
 The same state as a pixel-art office, except here **characters are agents, not tasks**, and each room means something specific:
 
@@ -180,6 +192,8 @@ It only assumes `~/.claude` exists and Node 20+. Developed on macOS; reports fro
 - [ ] Cost estimate per project from token buckets
 - [ ] Optional hook mode for sub-second updates instead of 4s polling
 - [ ] Support other agent CLIs that keep local transcripts
+- [x] Demo mode with fabricated data (`npm run demo`)
+- [x] UI in English, Turkish, Spanish, Chinese, Japanese and German
 
 ## Contributing
 
@@ -187,6 +201,7 @@ Issues and pull requests are welcome. The codebase is deliberately small and dep
 
 ```
 bin/crewdesk.mjs     CLI entry
+demo/seed.mjs        fabricated ~/.claude tree used by `npm run demo`
 src/server.mjs       HTTP + API
 src/sources.mjs      reads ~/.claude (projects, tasks, tokens, agent rosters)
 src/events.mjs       handoff log + room derivation
