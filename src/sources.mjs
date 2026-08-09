@@ -81,7 +81,9 @@ async function scanSession(file) {
   let title = null;
   let lastTool = null;
   let lastAssistantTs = null;
-  let lastEntryIsAssistant = false;
+  let lastQuestion = null;
+  let openSidechain = false;
+  let currentAgent = null;
   const subagents = new Map();
 
   for (const entry of entries) {
@@ -92,34 +94,56 @@ async function scanSession(file) {
 
     const ts = entry.timestamp ? Date.parse(entry.timestamp) : null;
 
+    // Ana oturum kullanıcıya döndü mü? Son asistan mesajı araç çağrısı içermiyorsa
+    // tur bitmiştir ve sıra kullanıcıdadır — "Claude soru sordu" sinyali budur.
+    if (entry.type === 'assistant' && !entry.isSidechain) {
+      const content = entry?.message?.content;
+      const tools = toolsFromEntry(entry);
+      if (tools.length === 0 && Array.isArray(content)) {
+        const text = content.filter((c) => c?.type === 'text').map((c) => c.text).join(' ').trim();
+        if (text) lastQuestion = { text: text.slice(-400), ts };
+      } else {
+        lastQuestion = null;
+      }
+    }
+    if (entry.type === 'user' && !entry.isSidechain) lastQuestion = null;
+
+    // Alt-ajan yaşam döngüsü: Agent çağrısı başlatır, sidechain akışı sürerken açıktır
     for (const tool of toolsFromEntry(entry)) {
-      if (tool.name === 'Agent' || tool.name === 'Task') {
-        const kind = tool.input?.subagent_type || tool.input?.description || 'agent';
-        const label = tool.input?.name || kind;
-        subagents.set(label, {
-          name: label,
-          type: kind,
+      if (!entry.isSidechain && (tool.name === 'Agent' || tool.name === 'Task')) {
+        currentAgent = tool.input?.subagent_type || tool.input?.name || tool.input?.description || 'agent';
+        openSidechain = true;
+        subagents.set(currentAgent, {
+          name: currentAgent,
+          type: tool.input?.subagent_type || 'agent',
           startedAt: ts,
           lastTool: null,
-          sidechain: false,
+          lastTs: ts,
         });
-      }
-      if (entry.isSidechain) {
-        const key = `sidechain:${entry.parentUuid || 'unknown'}`;
-        const prev = subagents.get(key) || { name: 'sub-agent', type: 'sidechain', sidechain: true };
+      } else if (entry.isSidechain) {
+        const key = currentAgent || 'sub-agent';
+        const prev = subagents.get(key) || { name: key, type: 'sidechain', startedAt: ts };
         subagents.set(key, { ...prev, lastTool: prettyTool(tool.name), lastTs: ts });
+        openSidechain = true;
       } else {
         lastTool = prettyTool(tool.name);
         if (ts) lastAssistantTs = ts;
       }
     }
 
-    if (entry.type === 'assistant') lastEntryIsAssistant = true;
-    if (entry.type === 'user') lastEntryIsAssistant = false;
+    // Ana akışa dönen bir asistan mesajı alt-ajanın bittiği anlamına gelir
+    if (entry.type === 'assistant' && !entry.isSidechain && openSidechain && toolsFromEntry(entry).length === 0) {
+      openSidechain = false;
+    }
   }
 
   const lastTs = stat.mtimeMs;
-  const awaitingInput = !lastEntryIsAssistant && Date.now() - lastTs > ACTIVE_MS;
+  const idle = Date.now() - lastTs;
+  // "Sana soru soruldu" yalnızca taze oturumlar için anlamlıdır; 8 saat önce
+  // kapanmış bir sohbet seni beklemiyor, sadece bitmiş.
+  const FRESH_MS = 8 * 60 * 60 * 1000;
+  const waitingForUser = Boolean(lastQuestion) && idle > 5 * 1000 && idle < FRESH_MS;
+  const running = !waitingForUser && idle <= ACTIVE_MS;
 
   return {
     sessionId,
@@ -131,7 +155,11 @@ async function scanSession(file) {
     lastTool,
     lastActivity: lastTs,
     lastAssistantTs,
-    status: statusFor(lastTs, awaitingInput),
+    status: waitingForUser ? 'waiting' : statusFor(lastTs, false),
+    running,
+    waitingForUser,
+    question: waitingForUser ? lastQuestion : null,
+    activeAgent: openSidechain && running ? currentAgent : null,
     subagents: [...subagents.values()],
   };
 }

@@ -59,8 +59,10 @@ function isPmRole(name = '') {
  * Ajanların o anki odasını ve yükünü olay kütüğünden + canlı aktiviteden türetir.
  * Kural sırası önemli: bekleme > teslim (taze) > çalışma/test > PM > dinlenme.
  */
-export function deriveCrew({ roster, tasks, events, activeNames, waitingNames }) {
+export function deriveCrew({ roster, tasks, events, sessions = [] }) {
   const HANDOFF_LINGER = 3 * 60 * 1000;
+  const activeNames = new Set(sessions.filter((s) => s.activeAgent).map((s) => s.activeAgent));
+  const waitingNames = new Set();
   const byTask = new Map();
 
   for (const event of events) {
@@ -77,7 +79,29 @@ export function deriveCrew({ roster, tasks, events, activeNames, waitingNames })
     assignments.get(owner).push({ ...task, lastEvent: last || null });
   }
 
-  return roster.map((agent) => {
+  // Her oturum bir karakterdir: ajan tanımı olmayan projelerde ekranda görünen tek kişi budur.
+  // Ajan kadrosu olan projede oturum orkestratördür (PM odası); kadrosu olmayanda
+  // işi bizzat yapan tek kişidir, o yüzden çalışma odasına oturur.
+  const busyRoom = roster.length ? 'pm' : 'work';
+
+  const crew = sessions.map((session) => ({
+    kind: 'session',
+    name: session.title || session.sessionId.slice(0, 8),
+    sessionId: session.sessionId,
+    color: null,
+    room: session.waitingForUser ? 'waiting' : session.running ? busyRoom : 'lounge',
+    active: session.running,
+    waiting: session.waitingForUser,
+    idleAtDesk: false,
+    tool: session.lastTool,
+    question: session.question,
+    queue: 0,
+    currentTask: null,
+    testRounds: 0,
+    description: session.gitBranch ? `dal: ${session.gitBranch}` : '',
+  }));
+
+  crew.push(...roster.map((agent) => {
     const queue = (assignments.get(agent.name) || []).filter((t) => t.stage !== 'done');
     const active = activeNames.has(agent.name);
     const waiting = waitingNames.has(agent.name);
@@ -85,24 +109,33 @@ export function deriveCrew({ roster, tasks, events, activeNames, waitingNames })
       .filter((e) => e.from === agent.name && e.event === 'delivered')
       .some((e) => Date.now() - e.ts < HANDOFF_LINGER);
 
+    // Oda gözleme dayanır: yalnızca gerçekten koşan ajan çalışma/test odasındadır.
+    // Kuyruğu olup koşmayan masasında sırada bekler; boşta olan dinlenmeye geçer.
     let room;
+    let idleAtDesk = false;
     if (waiting) room = 'waiting';
     else if (recentHandoff) room = 'handoff';
+    else if (active) room = isQaRole(agent.name) ? 'test' : 'work';
     else if (isPmRole(agent.name)) room = 'pm';
-    else if (queue.length === 0) room = 'lounge';
-    else if (isQaRole(agent.name)) room = 'test';
-    else room = 'work';
+    else if (queue.length > 0) { room = isQaRole(agent.name) ? 'test' : 'work'; idleAtDesk = true; }
+    else room = 'lounge';
 
     const current = queue.find((t) => t.status === 'in_progress') || queue[0] || null;
 
     return {
       ...agent,
+      kind: 'agent',
       room,
       active,
       waiting,
+      idleAtDesk,
+      tool: null,
+      question: null,
       queue: queue.length,
       currentTask: current ? { id: current.id, subject: current.subject, key: current.key } : null,
       testRounds: queue.reduce((max, t) => Math.max(max, t.testRounds || 0), 0),
     };
-  });
+  }));
+
+  return crew;
 }

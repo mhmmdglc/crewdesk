@@ -73,7 +73,7 @@ Claude Code tasks have three states: `pending`, `in_progress`, `completed`. A de
 - [ ] Drag and drop between columns
 - [x] Per-project agent roster read from `.claude/agents`
 - [ ] Per-project stage configuration (not every team has the same four stages)
-- [ ] Desktop notification when a session flips to *waiting for input*
+- [x] Alert (and optional desktop notification) when a session is waiting for your answer
 - [ ] Cost estimate per project from token buckets
 - [ ] Optional hook mode for sub-second updates instead of 4s polling
 - [ ] Support other agent CLIs that keep local transcripts
@@ -86,7 +86,9 @@ Claude Code tasks have three states: `pending`, `in_progress`, `completed`. A de
 
 ## Credits
 
-Character sprites are from **MetroCity — Free Topdown Character Pack** by [JIK-A-4](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack), released under **CC0 1.0** (public domain). Attribution is not required by the licence; it is here because the pack is good. Furniture, rooms and everything else are drawn procedurally in `public/office.js`.
+Character sprites: **MetroCity — Free Topdown Character Pack** by [JIK-A-4](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack), **CC0 1.0**.
+Furniture, floor and carpet sprites: **[Pixel Agents](https://github.com/pixel-agents-hq/pixel-agents)** by Pablo De Lucca, **MIT** — full notice in [LICENSE-THIRD-PARTY.md](LICENSE-THIRD-PARTY.md).
+The TV, delivery boxes and badges are drawn procedurally in `public/office.js`.
 
 ## License
 

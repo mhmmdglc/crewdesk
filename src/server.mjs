@@ -29,14 +29,19 @@ async function buildState() {
     const roster = await readAgentRoster(project.path);
     const events = (await readEvents()).filter((e) => !e.project || e.project === project.id);
 
-    const activeNames = new Set(project.sessions.flatMap((s) => s.subagents.map((a) => a.name)));
-    const waitingNames = new Set(
-      project.sessions.filter((s) => s.status === 'waiting').flatMap((s) => s.subagents.map((a) => a.name)),
-    );
-
     enriched.push({
       ...project,
-      crew: deriveCrew({ roster, tasks: decorated, events, activeNames, waitingNames }),
+      crew: deriveCrew({ roster, tasks: decorated, events, sessions: project.sessions }),
+      questions: project.sessions
+        .filter((s) => s.waitingForUser && s.question)
+        .map((s) => ({
+          sessionId: s.sessionId,
+          project: project.id,
+          projectName: project.name,
+          title: s.title || s.sessionId.slice(0, 8),
+          text: s.question.text,
+          since: s.lastActivity,
+        })),
       sessions: project.sessions.map((s) => ({
         ...s,
         tokensFiveHour: tokens.perSessionFiveHour[s.sessionId] || 0,
