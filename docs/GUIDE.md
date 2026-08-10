@@ -26,11 +26,19 @@ npx github:mhmmdglc/crewdesk demo            # fabricated data, your own is neve
 crewdesk is installed straight from the repository — there is no npm package to
 publish or trust, and `npx` caches the clone so later runs are instant.
 
+`demo` builds a throwaway tree under your temp directory (override it with
+`CREWDESK_DEMO_HOME`, which crewdesk refuses to erase unless the directory is
+empty or already its own) and keeps rewriting it while it runs, so the office
+does not fall quiet while you are still reading it.
+
 | Flag | Default | Meaning |
 |---|---|---|
 | `--port`, `-p` | `4600` | Port to listen on |
-| `--host` | `127.0.0.1` | Interface to bind. Read [Privacy](#privacy) before changing it |
+| `--host` | `127.0.0.1` | Interface to bind. crewdesk has no authentication, so anything but loopback opens your session titles, the assistant's last message, absolute transcript paths, project directories and git branches to everyone on the network. It prints a warning when you do it — read [Privacy](#privacy) first |
+| `--demo`, `-d` | | Serve fabricated data instead of your own (same as the `demo` argument) |
 | `--help`, `-h` | | Print usage |
+
+Anything else is refused: crewdesk exits with a message rather than silently ignoring an argument it does not know, so a typo like `--prot 4700` cannot quietly leave you on the default port.
 
 Global install if you would rather have the command around:
 
@@ -187,7 +195,7 @@ POSTs require a same-origin request and a JSON content type, and every key is va
 
 ## Privacy
 
-- Binds to `127.0.0.1`. `--host 0.0.0.0` exposes your task subjects, chat excerpts and project paths to your whole network; only do that on a network you trust.
+- Binds to `127.0.0.1`, and **has no authentication of any kind**. `--host 0.0.0.0` — or any other non-loopback address — hands everyone who can reach the port your session titles, the assistant's last message, task subjects, absolute transcript paths, project directories and git branches. crewdesk prints a warning on stderr when it starts that way; only do it on a network you trust.
 - Reads `~/.claude` **read-only**. It never modifies Claude Code's files.
 - Writes only to `~/.crewdesk/`.
 - No analytics, no crash reporting, no update checks, no outbound requests at all, zero runtime dependencies.

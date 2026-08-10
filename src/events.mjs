@@ -4,6 +4,11 @@ import { DATA_DIR } from './board.mjs';
 
 const LOG_FILE = path.join(DATA_DIR, 'events.jsonl');
 
+// Kütük sınırsız büyümesin diye satır tavanı. Tavan aşılınca en eski satırlar atılır;
+// bu "sakla değil türet" kuralını bozmaz: deriveCrew görev başına yalnızca SON olayı
+// ve son 3 dakikalık 'delivered' olaylarını kullanır, daha eski satırlar türetmeye girmez.
+const MAX_EVENTS = 5000;
+
 // Devir teslim kütüğü: pozisyonu değil, olayı saklarız. Oda, kuyruk, test turu,
 // darboğaz — hepsi bu kütükten türetilir.
 export const EVENTS = ['assigned', 'started', 'delivered', 'returned', 'done'];
@@ -45,10 +50,31 @@ export async function readEvents() {
 
 export async function appendEvent(event) {
   if (!EVENTS.includes(event.event)) throw new Error(`unknown event: ${event.event}`);
+  const log = await readEvents();
+
+  // Aynı devir teslim tekrar gönderilirse (yenile, çift tıkla) kütüğe kopya satır
+  // ekleme: son kayıtla aynı üçlüyse mevcut kaydı döndür — istek idempotent olsun.
+  const last = log[log.length - 1];
+  if (last && last.taskKey === event.taskKey && last.to === event.to && last.event === event.event) {
+    return last;
+  }
+
   const record = { ts: Date.now(), ...event };
   await fsp.mkdir(DATA_DIR, { recursive: true });
-  await fsp.appendFile(LOG_FILE, JSON.stringify(record) + '\n');
-  cache = [...(cache || []), record];
+  const next = [...log, record];
+
+  if (next.length > MAX_EVENTS) {
+    // Tavan aşıldı: en eski satırları atıp dosyayı atomik biçimde yeniden yaz
+    const trimmed = next.slice(-MAX_EVENTS);
+    const tmp = `${LOG_FILE}.${process.pid}.tmp`;
+    await fsp.writeFile(tmp, trimmed.map((e) => JSON.stringify(e)).join('\n') + '\n');
+    await fsp.rename(tmp, LOG_FILE);               // atomik değiştirme
+    cache = trimmed;
+  } else {
+    await fsp.appendFile(LOG_FILE, JSON.stringify(record) + '\n');
+    cache = next;
+  }
+
   const stat = await fsp.stat(LOG_FILE).catch(() => null);
   cacheMtime = stat?.mtimeMs || 0;
   return record;

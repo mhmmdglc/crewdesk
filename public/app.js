@@ -16,6 +16,10 @@ const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => (
 
 const fmt = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : String(n));
 
+// Saat biçimi arayüz diliyle aynı locale'i kullansın; dil kodları (en, tr, es,
+// zh, ja, de) doğrudan geçerli birer locale etiketi.
+const clock = (ts, opts) => new Date(ts).toLocaleTimeString(lang(), opts);
+
 const ago = (ts) => {
   const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
   if (s < 60) return `${s}${t('seconds')}`;
@@ -39,7 +43,7 @@ function meters(tokens) {
     const pct = Math.min(100, Math.round((g.used / g.limit) * 100));
     return meter(g.label || 'limit', `${pct}%`, pct);
   }).join('');
-  const reset = new Date(tokens.windowResetsAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  const reset = clock(tokens.windowResetsAt, { hour: '2-digit', minute: '2-digit' });
   return `${meter(t('fiveHourWindow'), `${fmt(tokens.fiveHour)} ${t('tokens')}`, null)}
     ${meter(t('sevenDayWindow'), `${fmt(tokens.sevenDay)} ${t('tokens')}`, null)}
     ${gauges}
@@ -250,14 +254,23 @@ function renderAlerts() {
 function render() {
   if (!state) return;
   document.getElementById('meters').innerHTML = meters(state.tokens);
-  document.getElementById('clock').textContent = new Date(state.generatedAt).toLocaleTimeString('tr-TR');
+  document.getElementById('clock').textContent = clock(state.generatedAt);
   if (!selected || !state.projects.some((p) => p.id === selected)) selected = state.projects[0]?.id || null;
   renderProjects();
   const project = state.projects.find((p) => p.id === selected);
-  if (!project) return;
-  renderSessions(project);
-  renderColumns(project);
+  if (project) {
+    renderSessions(project);
+    renderColumns(project);
+  } else {
+    // Hiç proje yoksa boş beyaz ekran yerine ne yapılması gerektiğini söyle.
+    document.getElementById('sessions').innerHTML = '';
+    document.getElementById('cols').innerHTML = `<div class="blank">
+      <div>${esc(t('noProjects'))}</div>
+      <div class="hint">${esc(t('noProjectsHint'))} <code>crewdesk demo</code></div>
+    </div>`;
+  }
   office.update(project, state.roomLabels);
+  renderOffline();
   const totalActive = state.projects.reduce((n, p) => n + p.activeCount, 0);
   document.getElementById('footer').textContent = t('footer', state.projects.length, totalActive);
 }
@@ -272,9 +285,40 @@ function setView(next) {
   localStorage.setItem('crewdesk:view', next);
 }
 
-async function load() {
-  const res = await fetch('/api/state');
-  state = await res.json();
+// ---- veri ----
+
+let offline = false;
+
+// Sunucu düşünce bayat veri canlıymış gibi görünmesin: üst şeritte son
+// güncelleme saatiyle birlikte "bağlantı yok" göstergesi çıkar.
+function renderOffline() {
+  const el = document.getElementById('offline');
+  el.hidden = !offline;
+  if (offline) el.innerHTML = esc(`${t('offline')} · ${t('lastUpdate')} ${state ? clock(state.generatedAt) : '—'}`);
+}
+
+// Periyodik tazeleme kullanıcının elindeki kontrolü kaçırmasın: odak tahtadaki
+// bir düğme ya da açılır listedeyse çizimi bir sonraki tura ertele. Kullanıcı
+// eyleminden gelen load() çağrıları (auto=false) hep hemen çizer.
+function interacting() {
+  const el = document.activeElement;
+  if (!el || (el.tagName !== 'SELECT' && el.tagName !== 'BUTTON')) return false;
+  return Boolean(el.closest('main'));
+}
+
+async function load(auto = false) {
+  try {
+    const res = await fetch('/api/state');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    state = await res.json();
+  } catch {
+    offline = true;
+    renderOffline();
+    return;
+  }
+  offline = false;
+  renderOffline();
+  if (auto && interacting()) return;
   render();
   renderAlerts();
 }
@@ -287,6 +331,7 @@ function applyStaticStrings() {
   document.getElementById('tabOffice').textContent = t('tabOffice');
   document.getElementById('projectsHeading').textContent = t('projects');
   document.getElementById('officeHint').innerHTML = t('officeHint');
+  renderOffline();
 }
 
 function mountLanguagePicker() {
@@ -313,5 +358,5 @@ if (window.Notification && Notification.permission === 'default') {
 }
 
 load();
-setInterval(load, 4000);
+setInterval(() => load(true), 4000);
 setView(localStorage.getItem('crewdesk:view') || 'board');

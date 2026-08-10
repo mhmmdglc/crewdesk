@@ -50,7 +50,11 @@ function parseLines(lines) {
   const out = [];
   for (const line of lines) {
     try {
-      out.push(JSON.parse(line));
+      const value = JSON.parse(line);
+      // "null", "42", "[]" gibi geçerli JSON ama kayıt olmayan satırları atla:
+      // aşağıdaki döngüler alan erişimi yapıyor.
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) continue;
+      out.push(value);
     } catch {
       /* partial or corrupt line */
     }
@@ -130,9 +134,9 @@ async function scanSession(file) {
   const subagents = new Map();
 
   for (const entry of entries) {
-    if (entry.cwd) cwd = entry.cwd;
-    if (entry.gitBranch) gitBranch = entry.gitBranch;
-    if (entry.customTitle || entry.aiTitle) title = entry.customTitle || entry.aiTitle;
+    if (entry?.cwd) cwd = entry.cwd;
+    if (entry?.gitBranch) gitBranch = entry.gitBranch;
+    if (entry?.customTitle || entry?.aiTitle) title = entry.customTitle || entry.aiTitle;
     if (entry?.message?.model) model = entry.message.model;
 
     const ts = entry.timestamp ? Date.parse(entry.timestamp) : null;
@@ -259,10 +263,20 @@ export async function scanProjects() {
 
     for (const f of files) {
       if (!f.endsWith('.jsonl')) continue;
-      const session = await scanSession(path.join(dirPath, f));
+      // Tek bozuk oturum tüm listeyi düşürmesin: hata veren dosyayı atlayıp devam et
+      let session;
+      try {
+        session = await scanSession(path.join(dirPath, f));
+      } catch {
+        continue;
+      }
       if (!session) continue;
       // Alt-ajanlar ayrı dosyada koşuyor: <sessionId>/subagents/agent-*.jsonl
-      session.subagents = await scanSubagents(path.join(dirPath, session.sessionId));
+      try {
+        session.subagents = await scanSubagents(path.join(dirPath, session.sessionId));
+      } catch {
+        session.subagents = [];
+      }
       session.activeAgent = session.subagents.find((a) => a.running)?.name || null;
       // Alt-ajanı koşan oturum çalışıyordur; senin cevabını beklemiyordur
       if (session.activeAgent) {

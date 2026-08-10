@@ -6,8 +6,8 @@ Repo: https://github.com/mhmmdglc/crewdesk (public, MIT).
 ## Çalıştırma
 
 - `node bin/crewdesk.mjs` → http://127.0.0.1:4600 (gerçek `~/.claude` okunur)
-- `node bin/crewdesk.mjs demo --port 4610` → uydurma veri, gerçek veri okunmaz
-- `npm run check` → tek doğrulama aracı: her dosyaya `node --check`. Otomatik test **yok**.
+- `node bin/crewdesk.mjs demo --port 4610` → uydurma veri, gerçek veri okunmaz (`--demo`/`-d` de aynı şey). Demo verisi 30 sn'de bir yeniden yazılır, yoksa 90 sn sonra ekran sönüyor.
+- `npm run check` → tek doğrulama aracı: repodaki **her** `.js`/`.mjs` dosyasına tek tek `node --check`. Otomatik test **yok**. Tek çağrıya birden çok dosya verme: `node --check` yalnızca ilkine bakar.
 
 Sunucuyu yeniden başlatmadan `src/` değişikliği etkili olmaz; `public/` için sayfa yenilemek yeter.
 
@@ -15,7 +15,7 @@ Sunucuyu yeniden başlatmadan `src/` değişikliği etkili olmaz; `public/` içi
 
 | Dosya | Sorumluluk |
 |---|---|
-| `bin/crewdesk.mjs` | CLI, `demo` alt komutu, eski veri dizini taşıma |
+| `bin/crewdesk.mjs` | CLI çözümleyici (bilinmeyen argüman = hata), `demo` alt komutu + periyodik tazeleme, bağlanma hatalarının açıklanması, loopback dışı bind uyarısı, eski veri dizini taşıma |
 | `src/server.mjs` | HTTP + API, CSP, CSRF/Host doğrulama, statik sunum |
 | `src/sources.mjs` | `~/.claude`'u okuyan **tek** dosya (proje, oturum, alt-ajan, token, ajan kadrosu) |
 | `src/events.mjs` | Devir teslim kütüğü + oda türetme kuralları |
@@ -23,7 +23,7 @@ Sunucuyu yeniden başlatmadan `src/` değişikliği etkili olmaz; `public/` içi
 | `public/app.js` | Arayüz mantığı, uyarılar |
 | `public/office.js` | Canvas pixel ofis |
 | `public/i18n.js` | 6 dil (en varsayılan) |
-| `demo/seed.mjs` | Uydurma `~/.claude` ağacı |
+| `demo/seed.mjs` | Uydurma `~/.claude` ağacı; `seed({ refresh: true })` zaman damgalarını tazeler, `.crewdesk-demo` işaretçisi olmayan dizini silmez |
 
 ## Bozulmaması gereken kurallar
 

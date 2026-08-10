@@ -28,6 +28,8 @@ npx github:mhmmdglc/crewdesk
 
 Open **http://127.0.0.1:4600**. No config, no setup.
 
+It binds to loopback and has no authentication. `--host 0.0.0.0` opens your session titles, the assistant's last message, absolute transcript paths, project directories and git branches to everyone on the network — crewdesk warns you when you do it, and you should only do it on a network you trust.
+
 Just want to look around first?
 
 ```bash
