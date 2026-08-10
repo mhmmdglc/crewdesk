@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scanProjects, readTasks, readTokenWindows, readAgentRoster } from './sources.mjs';
 import { decorate, setStage, setOwner, assertKey, ValidationError, STAGES } from './board.mjs';
-import { readEvents, appendEvent, deriveCrew, ROOMS, ROOM_LABEL, EVENTS } from './events.mjs';
+import { readEvents, appendEvent, deriveCrew, ROOMS, EVENTS } from './events.mjs';
 
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const MAX_BODY = 256 * 1024;
@@ -114,7 +114,6 @@ async function buildState() {
     generatedAt: Date.now(),
     stages: STAGES,
     rooms: ROOMS,
-    roomLabels: ROOM_LABEL,
     projects: enriched,
     tokens,
   };
@@ -209,15 +208,18 @@ export function createServer({ address = '127.0.0.1', port = 4600 } = {}) {
         return json(res, 403, { error: 'host not allowed' });
       }
 
-      if (req.method === 'GET' && url.pathname === '/api/state') {
+      // HEAD, GET gibi ele alınır; Node gövdeyi kendisi atar
+      const readMethod = req.method === 'HEAD' ? 'GET' : req.method;
+
+      if (readMethod === 'GET' && url.pathname === '/api/state') {
         return json(res, 200, await buildState());
       }
 
-      if (req.method === 'GET' && url.pathname === '/api/events') {
+      if (readMethod === 'GET' && url.pathname === '/api/events') {
         return json(res, 200, { events: await readEvents() });
       }
 
-      if (req.method === 'GET' && url.pathname === '/api/health') {
+      if (readMethod === 'GET' && url.pathname === '/api/health') {
         return json(res, 200, { ok: true });
       }
 
@@ -267,7 +269,7 @@ export function createServer({ address = '127.0.0.1', port = 4600 } = {}) {
         return json(res, 404, { error: 'unknown endpoint' });
       }
 
-      if (req.method === 'GET') return await serveStatic(res, url.pathname);
+      if (readMethod === 'GET') return await serveStatic(res, url.pathname);
 
       res.writeHead(405).end('method not allowed');
     } catch (error) {

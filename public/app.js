@@ -100,8 +100,9 @@ function renderColumns(project) {
             ${task.testRounds ? `<span class="badge rounds">${esc(t('testRound', task.testRounds))}</span>` : ''}
             <span class="badge">#${esc(task.id)}</span>
           </div>
-          <div class="move">
+          <div class="move" role="group" aria-label="${esc(t('moveTask', task.subject || task.id))}">
             ${state.stages.map((s) => `<button data-key="${esc(task.key)}" data-stage="${esc(s)}"
+              aria-pressed="${s === task.stage}"
               class="${s === task.stage ? 'on' : ''}">${esc(stageLabel(s))}</button>`).join('')}
           </div>
           <select class="assign" data-key="${esc(task.key)}" data-from="${esc(task.owner || '')}">
@@ -199,10 +200,10 @@ function renderAlerts() {
       </span>
     </div>
     ${shown.map((q) => `
-      <div class="alert" data-project="${esc(q.project)}" data-key="${esc(alertKey(q))}">
+      <div class="alert" role="button" tabindex="0" data-project="${esc(q.project)}" data-key="${esc(alertKey(q))}">
         <div class="who">
           <span>❓ ${esc(q.projectName)}</span>
-          <span>${ago(q.since)} ${t('ago')} <b class="x" title="${t('markRead')}">×</b></span>
+          <span>${ago(q.since)} ${t('ago')} <button class="x" aria-label="${esc(t('markRead'))}" title="${esc(t('markRead'))}">×</button></span>
         </div>
         <div class="txt">${esc(q.text)}</div>
       </div>`).join('')}
@@ -237,6 +238,12 @@ function renderAlerts() {
       selected = el.dataset.project;
       render();
     };
+    // kart artık role="button" tabindex="0": klavyeden de aynı şey olmalı
+    el.onkeydown = (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      el.onclick(event);
+    };
   });
 
   for (const q of asks) {
@@ -269,7 +276,7 @@ function render() {
       <div class="hint">${esc(t('noProjectsHint'))} <code>crewdesk demo</code></div>
     </div>`;
   }
-  office.update(project, state.roomLabels);
+  office.update(project);
   renderOffline();
   const totalActive = state.projects.reduce((n, p) => n + p.activeCount, 0);
   document.getElementById('footer').textContent = t('footer', state.projects.length, totalActive);
@@ -336,10 +343,13 @@ function applyStaticStrings() {
 
 function mountLanguagePicker() {
   const select = document.getElementById('langSelect');
+  select.setAttribute('aria-label', t('langLabel'));
   select.innerHTML = LANGUAGES.map((l) => `<option value="${l.code}"
     ${l.code === lang() ? 'selected' : ''}>${l.label}</option>`).join('');
   select.onchange = () => {
     setLang(select.value);
+    document.documentElement.lang = select.value;
+    select.setAttribute('aria-label', t('langLabel'));
     applyStaticStrings();
     alertSignature = '';
     office.invalidate?.();

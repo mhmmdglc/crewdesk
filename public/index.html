@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -113,7 +113,11 @@
   .alert.more { text-align: center; color: #fdba74; font-size: 11px; padding: 6px; }
   .alert.quiet { background: var(--panel); border-color: var(--line); border-left-color: var(--dim);
     color: var(--dim); font-size: 11px; text-align: center; padding: 6px; cursor: default; }
-  .alert .x { color: #fdba74; padding: 0 3px; cursor: pointer; }
+  .alert .x { color: #fdba74; background: none; border: 0; cursor: pointer; font-size: 15px;
+    min-width: 24px; min-height: 24px; line-height: 1; padding: 0; border-radius: 4px; }
+  .alert .x:hover, .alert .x:focus-visible { background: rgba(251,146,60,0.18); }
+  .alert:focus-visible, .proj:focus-visible, .move button:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 1px; }
   .alert .x:hover { color: #fff; }
   .alert-head {
     display: flex; justify-content: space-between; align-items: center; gap: 8px;
@@ -168,7 +172,7 @@
   <div class="meters" id="meters"></div>
   <div style="margin-left:auto; display:flex; gap:8px; align-items:center">
     <span class="pill offline" id="offline" hidden></span>
-    <select id="langSelect" class="lang" aria-label="language"></select>
+    <select id="langSelect" class="lang"></select>
     <span class="pill" id="clock"></span>
   </div>
 </header>
@@ -184,7 +188,9 @@
       <div class="cols" id="cols"></div>
     </div>
     <div id="officeView" hidden>
-      <canvas id="officeCanvas"></canvas>
+      <canvas id="officeCanvas" role="img" aria-label="Pixel office: each character is an agent, each room shows what it is doing">
+        <p id="officeFallback"></p>
+      </canvas>
       <div class="hint" id="officeHint"></div>
     </div>
   </section>

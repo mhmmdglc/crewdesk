@@ -101,7 +101,6 @@ export class Office {
     for (let i = 0; i < 3; i++) this.img[`carpet_${i}`] = this.load(`carpets/carpet_${i}.png`);
 
     this.people = new Map();
-    this.labels = {};
     this.tick = 0;
     this.running = false;
     this.hover = null;
@@ -169,8 +168,7 @@ export class Office {
     return at(30 + col * 62, 50 + row * 58);
   }
 
-  update(project, roomLabels) {
-    if (roomLabels) this.labels = roomLabels;
+  update(project) {
     const crew = project?.crew || [];
     const perRoom = {};
     const seen = new Set();
@@ -531,12 +529,15 @@ export class Office {
       ctx.font = `${7 * PX}px ui-monospace, Menlo, monospace`;
       ctx.textAlign = 'center';
       ctx.fillStyle = p.waiting ? '#fb923c' : p.active ? '#4ade80' : p.idleAtDesk ? '#8f89a8' : '#b9b3cc';
+      // "ux-designer" kısaltılınca "ux-ux" oluyordu: tekrar eden parçayı sadeleştir
       const short = String(p.name)
         .replace(/-specialist$/, '').replace(/-reviewer$/, '')
-        .replace(/-manager$/, '-mgr').replace(/-designer$/, '-ux');
+        .replace(/-manager$/, '-mgr').replace(/-designer$/, '-ux')
+        .replace(/^([^-]+)-\1$/, '$1');
       ctx.fillText(short.length > 14 ? short.slice(0, 13) + '…' : short, p.x + 8 * PX, p.y + 40 * PX);
 
-      if (p.color && AGENT_COLOR[p.color]) {
+      // ajan .md'sindeki serbest "color" alanı: yalnızca kendi tablomuzdaki anahtarlar
+      if (p.color && Object.hasOwn(AGENT_COLOR, p.color)) {
         this.p(p.x + 1 * PX, p.y + 42 * PX, 14 * PX, 2 * PX, AGENT_COLOR[p.color]);
       }
       if (p.kind === 'session') {
@@ -552,7 +553,7 @@ export class Office {
         ? `${h.name}: ${h.question.text.slice(-70)}`
         : h.currentTask ? `${h.name}: #${h.currentTask.id} ${h.currentTask.subject}`
           : h.description ? `${h.name} — ${h.description}`
-            : `${h.name}: kuyruk boş`;
+            : `${h.name}: ${t('queueEmpty')}`;
       ctx.font = `${8 * PX}px ui-monospace, Menlo, monospace`;
       const label = text.length > 70 ? text.slice(0, 69) + '…' : text;
       const w = ctx.measureText(label).width + 10 * PX;
