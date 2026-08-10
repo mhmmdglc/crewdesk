@@ -535,13 +535,19 @@ export class Office {
 
       ctx.font = `${7 * PX}px ui-monospace, Menlo, monospace`;
       ctx.textAlign = 'center';
-      ctx.fillStyle = p.waiting ? '#fb923c' : p.active ? '#4ade80' : p.idleAtDesk ? '#8f89a8' : '#b9b3cc';
+      const nameColor = p.waiting ? '#fb923c' : p.active ? '#4ade80' : p.idleAtDesk ? '#8f89a8' : '#b9b3cc';
       // "ux-designer" kısaltılınca "ux-ux" oluyordu: tekrar eden parçayı sadeleştir
       const short = String(p.name)
         .replace(/-specialist$/, '').replace(/-reviewer$/, '')
         .replace(/-manager$/, '-mgr').replace(/-designer$/, '-ux')
         .replace(/^([^-]+)-\1$/, '$1');
-      ctx.fillText(short.length > 14 ? short.slice(0, 13) + '…' : short, p.x + 8 * PX, p.y + 40 * PX);
+      const label = short.length > 14 ? short.slice(0, 13) + '…' : short;
+      // Ad, arkasındaki bitki/raf sprite'ının üstüne düşünce okunmuyordu; oda isim
+      // levhasındaki gibi kendi zemini olsun.
+      const labelW = ctx.measureText(label).width;
+      this.p(p.x + 8 * PX - labelW / 2 - 2 * PX, p.y + 33 * PX, labelW + 4 * PX, 9 * PX, 'rgba(12,11,18,0.7)');
+      ctx.fillStyle = nameColor;                     // this.p() fillStyle'ı kendi rengiyle bırakıyor
+      ctx.fillText(label, p.x + 8 * PX, p.y + 40 * PX);
 
       // ajan .md'sindeki serbest "color" alanı: yalnızca kendi tablomuzdaki anahtarlar
       if (p.color && Object.hasOwn(AGENT_COLOR, p.color)) {
