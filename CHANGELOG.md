@@ -2,7 +2,7 @@
 
 All notable changes to crewdesk are recorded here.
 
-## [0.1.0] — unreleased
+## [0.1.0] — 2026-08-10
 
 First public release.
 
@@ -16,6 +16,14 @@ First public release.
 - **Question alerts** — distinguishes a real question from a finished turn; dismissable per card, markable all-read, collapsible to a bell, all persisted.
 - **Handoff log** — an append-only `~/.crewdesk/events.jsonl` from which queues, rooms and test rounds are derived rather than stored.
 - **HTTP API** — `/api/state`, `/api/events`, `/api/stage`, `/api/assign`, `/api/health`.
+
+### Fixed
+
+- **CLI arguments are parsed, not guessed.** `--demo` and `-d` now start demo mode instead of silently serving your real data, and any argument crewdesk does not recognise — `--prot 4700`, `--frobnicate` — exits with a message rather than being swallowed.
+- **Bad ports and unreachable hosts fail with a sentence, not a stack trace.** `--port` must be an integer between 1 and 65535, and an address already in use, refused by the OS or belonging to no local interface is reported in one line.
+- **A non-loopback `--host` prints a warning.** crewdesk has no authentication, so binding to the network is now stated as what it is.
+- **Demo data stays alive while you read it.** It was frozen at seed time and went quiet after ninety seconds; it is now refreshed periodically. `crewdesk demo` also refuses to erase a `CREWDESK_DEMO_HOME` directory that is not its own.
+- **`npm run check` checks every file.** `node --check` only reads its first argument, so the old multi-file invocation passed while later files were broken.
 
 ### Install
 

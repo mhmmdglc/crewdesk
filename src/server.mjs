@@ -4,10 +4,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scanProjects, readTasks, readTokenWindows, readAgentRoster } from './sources.mjs';
 import { decorate, setStage, setOwner, assertKey, ValidationError, STAGES } from './board.mjs';
-import { readEvents, appendEvent, deriveCrew, ROOMS, ROOM_LABEL, EVENTS } from './events.mjs';
+import { readEvents, appendEvent, deriveCrew, ROOMS, EVENTS } from './events.mjs';
 
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const MAX_BODY = 256 * 1024;
+// Tavanı aşan gövdeyi 413 dönebilmek için yine de okuyup atarız; bu da sonsuz
+// olmasın diye ikinci bir sınır.
+const DRAIN_LIMIT = 4 * 1024 * 1024;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -31,11 +34,48 @@ function sameOrigin(req, host) {
   }
 }
 
+// Host başlığından port'u ayırır; IPv6 köşeli parantezli biçimi de tanır
+// Hata yanıtları da tip ve güvenlik başlığı taşısın: sniff edilecek bir gövde bırakma
+function plain(res, code, body) {
+  res.writeHead(code, {
+    'content-type': 'text/plain; charset=utf-8',
+    'x-content-type-options': 'nosniff',
+    'referrer-policy': 'no-referrer',
+    'content-security-policy': "default-src 'none'; frame-ancestors 'none'",
+  });
+  res.end(body);
+}
+
+function hostName(host) {
+  if (host.startsWith('[')) {
+    const end = host.indexOf(']');
+    return end === -1 ? host : host.slice(0, end + 1);
+  }
+  return host.split(':')[0];
+}
+
+const IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}$/;
+
+function isIpLiteral(name) {
+  if (IPV4.test(name)) return name.split('.').every((part) => Number(part) <= 255);
+  return /^\[[0-9a-f:.]+\]$/.test(name);           // IPv6 literal
+}
+
 // DNS-rebinding koruması: Host başlığı bizim dinlediğimiz adres olmalı
 function hostAllowed(req, address, port) {
   const host = (req.headers.host || '').toLowerCase();
   if (!host) return false;
-  const [name] = host.split(':');
+  const name = hostName(host);
+  // Port da bizim dinlediğimiz port olmalı; yoksa varsayılan 80/443 kastedilmiştir
+  const declared = host.slice(name.length).startsWith(':') ? host.slice(name.length + 1) : '';
+  if (declared !== String(port) && !(declared === '' && (port === 80 || port === 443))) return false;
+  // Joker bind'de (0.0.0.0 / ::) hangi arayüzden gelineceğini bilemeyiz; tarayıcı
+  // Host olarak makinenin LAN IP'sini gönderir. Bu yüzden Host'un IP-literal (ya da
+  // localhost) olması yeterli sayılır — rastgele bir DNS adı hâlâ reddedilir,
+  // dolayısıyla rebinding koruması ayakta kalır.
+  if (address === '0.0.0.0' || address === '::') {
+    return name === 'localhost' || isIpLiteral(name);
+  }
   const allowed = new Set(['127.0.0.1', 'localhost', '[::1]', '::1', address]);
   return allowed.has(name);
 }
@@ -53,7 +93,8 @@ async function buildState() {
     }
 
     const decorated = await decorate(tasks);
-    const roster = await readAgentRoster(project.path);
+    // Okunamayan bir kadro dizini tüm durumu düşürmesin: kadrosuz devam et
+    const roster = await readAgentRoster(project.path).catch(() => []);
     const projectEvents = events.filter((e) => !e.project || e.project === project.id);
 
     enriched.push({
@@ -87,7 +128,6 @@ async function buildState() {
     generatedAt: Date.now(),
     stages: STAGES,
     rooms: ROOMS,
-    roomLabels: ROOM_LABEL,
     projects: enriched,
     tokens,
   };
@@ -102,17 +142,32 @@ function json(res, code, body) {
   res.end(JSON.stringify(body));
 }
 
+// Gövde tavanı aşımı bir doğrulama hatası değil, 413'tür; ayırt edebilmek için
+// kendi sınıfı var.
+class PayloadTooLargeError extends Error {
+  constructor(message) {
+    super(message);
+    this.statusCode = 413;
+  }
+}
+
 async function readBody(req) {
   const chunks = [];
   let size = 0;
+  let tooLarge = false;
   for await (const chunk of req) {
     size += chunk.length;
     if (size > MAX_BODY) {
-      req.destroy();
-      throw new ValidationError('body too large');
+      // Soketi koparmak istemciye yanıt yerine "empty reply" verdiriyordu. Gövdeyi
+      // biriktirmeyi bırakıp okumaya devam ediyoruz ki düzgün bir 413 dönebilelim;
+      // makul olmayan boyutta ise okumayı da kesiyoruz.
+      tooLarge = true;
+      if (size > DRAIN_LIMIT) break;
+      continue;
     }
     chunks.push(chunk);
   }
+  if (tooLarge) throw new PayloadTooLargeError('body too large');
   if (chunks.length === 0) return {};
   let parsed;
   try {
@@ -138,7 +193,7 @@ async function serveStatic(res, urlPath) {
   const rel = urlPath === '/' ? 'index.html' : urlPath.replace(/^\/+/, '');
   const file = path.resolve(PUBLIC_DIR, rel);
   if (file !== PUBLIC_DIR && !file.startsWith(PUBLIC_DIR + path.sep)) {
-    res.writeHead(403).end('forbidden');
+    plain(res, 403, 'forbidden');
     return;
   }
   try {
@@ -154,7 +209,7 @@ async function serveStatic(res, urlPath) {
     });
     res.end(data);
   } catch {
-    res.writeHead(404).end('not found');
+    plain(res, 404, 'not found');
   }
 }
 
@@ -167,15 +222,18 @@ export function createServer({ address = '127.0.0.1', port = 4600 } = {}) {
         return json(res, 403, { error: 'host not allowed' });
       }
 
-      if (req.method === 'GET' && url.pathname === '/api/state') {
+      // HEAD, GET gibi ele alınır; Node gövdeyi kendisi atar
+      const readMethod = req.method === 'HEAD' ? 'GET' : req.method;
+
+      if (readMethod === 'GET' && url.pathname === '/api/state') {
         return json(res, 200, await buildState());
       }
 
-      if (req.method === 'GET' && url.pathname === '/api/events') {
+      if (readMethod === 'GET' && url.pathname === '/api/events') {
         return json(res, 200, { events: await readEvents() });
       }
 
-      if (req.method === 'GET' && url.pathname === '/api/health') {
+      if (readMethod === 'GET' && url.pathname === '/api/health') {
         return json(res, 200, { ok: true });
       }
 
@@ -200,9 +258,14 @@ export function createServer({ address = '127.0.0.1', port = 4600 } = {}) {
           const body = await readBody(req);
           assertKey(body.key);
           const agent = optionalString(body.agent, 'agent', 120);
-          const event = body.event === undefined ? 'assigned' : String(body.event);
+          // Ham değeri mesaja gömme: derin iç içe bir dizi stringify'da RangeError
+          // atıp 400 yerine 500 döndürüyordu. Önce tür, sonra liste kontrolü.
+          const event = body.event === undefined ? 'assigned' : body.event;
+          if (typeof event !== 'string') {
+            throw new ValidationError('event must be a string');
+          }
           if (!EVENTS.includes(event)) {
-            throw new ValidationError(`unknown event: ${event}`);
+            throw new ValidationError(`event must be one of: ${EVENTS.join(', ')}`);
           }
           // önce kütük, sonra sahiplik: ikisi de doğrulandıktan sonra yazılır
           const record = await appendEvent({
@@ -220,11 +283,14 @@ export function createServer({ address = '127.0.0.1', port = 4600 } = {}) {
         return json(res, 404, { error: 'unknown endpoint' });
       }
 
-      if (req.method === 'GET') return await serveStatic(res, url.pathname);
+      if (readMethod === 'GET') return await serveStatic(res, url.pathname);
 
-      res.writeHead(405).end('method not allowed');
+      plain(res, 405, 'method not allowed');
     } catch (error) {
       if (error instanceof ValidationError) return json(res, 400, { error: error.message });
+      if (error instanceof PayloadTooLargeError) return json(res, 413, { error: error.message });
+      // İstemciye iç detay sızmasın, ama 500'ün sebebi sunucu tarafında görünsün
+      console.error(`crewdesk: ${req.method} ${url.pathname} failed`, error);
       json(res, 500, { error: 'internal error' });
     }
   });

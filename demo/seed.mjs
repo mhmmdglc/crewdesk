@@ -10,7 +10,13 @@ import os from 'node:os';
 export const DEMO_HOME = process.env.CREWDESK_DEMO_HOME
   || path.join(os.tmpdir(), 'crewdesk-demo');
 
-const now = Date.now();
+// Bizim ürettiğimiz dizinin işareti. CREWDESK_DEMO_HOME yanlış verilmişse
+// kullanıcının dizinini silmemek için bakılan tek şey bu.
+const MARKER = '.crewdesk-demo';
+
+// Her zaman damgası seed() çağrıldığı ana göre türetilir; demo sunucusu bu
+// dosyaları periyodik olarak yeniden yazdığı için ekran canlı kalır.
+let now = Date.now();
 const min = (n) => n * 60 * 1000;
 
 const write = (file, body) => {
@@ -127,8 +133,28 @@ function encodeProjectDir(cwd) {
   return cwd.replace(/\//g, '-');
 }
 
-export function seed() {
+// Dizini silmeden önce gerçekten bize ait olduğunu doğrula. Varsayılan yol
+// (tmp/crewdesk-demo) bizimdir; CREWDESK_DEMO_HOME elle verilmişse yanlış bir
+// yol tüm dizini silebilir, o yüzden ya boş ya da işaretçimizi taşıyor olmalı.
+function resetDemoHome() {
+  if (process.env.CREWDESK_DEMO_HOME && fs.existsSync(DEMO_HOME)
+    && !fs.existsSync(path.join(DEMO_HOME, MARKER))
+    && fs.readdirSync(DEMO_HOME).length > 0) {
+    throw new Error(`refusing to erase ${DEMO_HOME}: it has no ${MARKER} marker, so it is not a `
+      + 'crewdesk demo directory. Point CREWDESK_DEMO_HOME at an empty or unused directory.');
+  }
   fs.rmSync(DEMO_HOME, { recursive: true, force: true });
+  fs.mkdirSync(DEMO_HOME, { recursive: true });
+  fs.writeFileSync(path.join(DEMO_HOME, MARKER), 'crewdesk demo data — safe to delete\n');
+}
+
+// refresh: dizini silmeden yalnızca zaman damgalarını tazeler. Canlılık dosya
+// mtime'ından okunduğu için JSON içindeki timestamp'i güncellemek yetmez; her
+// dosya yeniden yazılıp utimes'ı da geri alınır. Kullanıcının taşıdığı kartlar
+// (overlay/events) tazelemede korunur.
+export function seed({ refresh = false } = {}) {
+  now = Date.now();
+  if (!refresh) resetDemoHome();
 
   const overlay = {};
   const events = [];
@@ -205,12 +231,19 @@ export function seed() {
 
   write(path.join(DEMO_HOME, '.claude', 'session-monitor', 'token-buckets.json'), JSON.stringify(buckets, null, 1));
   write(path.join(DEMO_HOME, '.claude', 'session-monitor', 'official-usage.json'), JSON.stringify({ gauges: [], ts: 0 }));
-  write(path.join(DEMO_HOME, '.crewdesk', 'overlay.json'), JSON.stringify(overlay, null, 2));
-  write(path.join(DEMO_HOME, '.crewdesk', 'events.jsonl'), jsonl(events));
+  if (!refresh) {
+    write(path.join(DEMO_HOME, '.crewdesk', 'overlay.json'), JSON.stringify(overlay, null, 2));
+    write(path.join(DEMO_HOME, '.crewdesk', 'events.jsonl'), jsonl(events));
+  }
 
   return DEMO_HOME;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  console.log(`crewdesk demo data → ${seed()}`);
+  try {
+    console.log(`crewdesk demo data → ${seed()}`);
+  } catch (error) {
+    process.stderr.write(`crewdesk: ${error.message}\n`);
+    process.exit(1);
+  }
 }

@@ -101,7 +101,6 @@ export class Office {
     for (let i = 0; i < 3; i++) this.img[`carpet_${i}`] = this.load(`carpets/carpet_${i}.png`);
 
     this.people = new Map();
-    this.labels = {};
     this.tick = 0;
     this.running = false;
     this.hover = null;
@@ -169,8 +168,7 @@ export class Office {
     return at(30 + col * 62, 50 + row * 58);
   }
 
-  update(project, roomLabels) {
-    if (roomLabels) this.labels = roomLabels;
+  update(project) {
     const crew = project?.crew || [];
     const perRoom = {};
     const seen = new Set();
@@ -518,25 +516,41 @@ export class Office {
       }
       this.drawPerson(p, walking);
 
+      // Rozetler karakterin üstüne çıkar; oda isim levhası da odanın üst şeridinde.
+      // Üstte yer yoksa rozetleri karakterin altına al, çakışmasınlar.
+      const band = this.roomRect(p.room).y + 22 * PX;
+      const above = p.y - 38 * PX >= band;
+      const near = above ? p.y - 26 * PX : p.y + 46 * PX;
+      const far = above ? p.y - 38 * PX : p.y + 58 * PX;
+
       if (p.currentTask && !walking) {
-        this.tag(p.x + 8 * PX, p.y - 26 * PX, `#${p.currentTask.id}`, 'rgba(14,13,20,0.92)', '#e8e6f0');
+        this.tag(p.x + 8 * PX, near, `#${p.currentTask.id}`, 'rgba(14,13,20,0.92)', '#e8e6f0');
       }
       if (p.tool && p.active) {
-        this.tag(p.x + 8 * PX, p.y - 38 * PX, p.tool.slice(0, 22), 'rgba(14,13,20,0.92)', '#4ade80');
+        this.tag(p.x + 8 * PX, far, p.tool.slice(0, 22), 'rgba(14,13,20,0.92)', '#4ade80');
       }
       if (p.waiting) {
-        this.tag(p.x + 8 * PX, p.y - 26 * PX, t('hasQuestion'), '#7c2d12', '#fed7aa');
+        this.tag(p.x + 8 * PX, near, t('hasQuestion'), '#7c2d12', '#fed7aa');
       }
 
       ctx.font = `${7 * PX}px ui-monospace, Menlo, monospace`;
       ctx.textAlign = 'center';
-      ctx.fillStyle = p.waiting ? '#fb923c' : p.active ? '#4ade80' : p.idleAtDesk ? '#8f89a8' : '#b9b3cc';
+      const nameColor = p.waiting ? '#fb923c' : p.active ? '#4ade80' : p.idleAtDesk ? '#8f89a8' : '#b9b3cc';
+      // "ux-designer" kısaltılınca "ux-ux" oluyordu: tekrar eden parçayı sadeleştir
       const short = String(p.name)
         .replace(/-specialist$/, '').replace(/-reviewer$/, '')
-        .replace(/-manager$/, '-mgr').replace(/-designer$/, '-ux');
-      ctx.fillText(short.length > 14 ? short.slice(0, 13) + '…' : short, p.x + 8 * PX, p.y + 40 * PX);
+        .replace(/-manager$/, '-mgr').replace(/-designer$/, '-ux')
+        .replace(/^([^-]+)-\1$/, '$1');
+      const label = short.length > 14 ? short.slice(0, 13) + '…' : short;
+      // Ad, arkasındaki bitki/raf sprite'ının üstüne düşünce okunmuyordu; oda isim
+      // levhasındaki gibi kendi zemini olsun.
+      const labelW = ctx.measureText(label).width;
+      this.p(p.x + 8 * PX - labelW / 2 - 2 * PX, p.y + 33 * PX, labelW + 4 * PX, 9 * PX, 'rgba(12,11,18,0.7)');
+      ctx.fillStyle = nameColor;                     // this.p() fillStyle'ı kendi rengiyle bırakıyor
+      ctx.fillText(label, p.x + 8 * PX, p.y + 40 * PX);
 
-      if (p.color && AGENT_COLOR[p.color]) {
+      // ajan .md'sindeki serbest "color" alanı: yalnızca kendi tablomuzdaki anahtarlar
+      if (p.color && Object.hasOwn(AGENT_COLOR, p.color)) {
         this.p(p.x + 1 * PX, p.y + 42 * PX, 14 * PX, 2 * PX, AGENT_COLOR[p.color]);
       }
       if (p.kind === 'session') {
@@ -552,7 +566,7 @@ export class Office {
         ? `${h.name}: ${h.question.text.slice(-70)}`
         : h.currentTask ? `${h.name}: #${h.currentTask.id} ${h.currentTask.subject}`
           : h.description ? `${h.name} — ${h.description}`
-            : `${h.name}: kuyruk boş`;
+            : `${h.name}: ${t('queueEmpty')}`;
       ctx.font = `${8 * PX}px ui-monospace, Menlo, monospace`;
       const label = text.length > 70 ? text.slice(0, 69) + '…' : text;
       const w = ctx.measureText(label).width + 10 * PX;

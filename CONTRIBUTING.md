@@ -17,10 +17,12 @@ There is no watcher: restart the process after changing anything under `src/`. C
 ## Checks before a pull request
 
 ```bash
-node --check src/*.mjs bin/*.mjs public/office.js
+npm run check
 ```
 
-That is the whole test suite today, which is an honest way of saying there isn't one. If you add logic to `src/events.mjs` or `src/sources.mjs`, a small script under `test/` that exercises it with fixture files would be very welcome.
+That parses every `.js`/`.mjs` file in the repository with `node --check` and names the ones that fail. Do not replace it with a single `node --check` call over a glob: `node --check` only reads its first argument, so a glob reports success while the second file is broken.
+
+It is also the whole test suite today, which is an honest way of saying there isn't one. If you add logic to `src/events.mjs` or `src/sources.mjs`, a small script under `test/` that exercises it with fixture files would be very welcome.
 
 ## Layout
 
@@ -31,8 +33,11 @@ That is the whole test suite today, which is an honest way of saying there isn't
 | `src/sources.mjs` | Everything that reads `~/.claude`. The only file that knows Claude Code's on-disk format |
 | `src/events.mjs` | The handoff log and the rules that derive rooms from it |
 | `src/board.mjs` | Stage/owner overlay persistence |
-| `public/index.html` | UI shell, project sidebar, board, alerts |
+| `public/index.html` | Markup shell and stylesheet |
+| `public/app.js` | Sidebar, board, alerts, polling — everything the page does |
 | `public/office.js` | Canvas renderer for the pixel office |
+| `public/i18n.js` | Six languages; every key exists in all of them |
+| `demo/seed.mjs` | Fabricated `~/.claude` tree for `crewdesk demo` |
 
 If you want to support another agent CLI, `src/sources.mjs` is the file to change; nothing else should need to know where the data came from.
 

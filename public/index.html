@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>crewdesk</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%238b7dfa'/%3E%3Crect x='3' y='4' width='4' height='8' fill='%2314131a'/%3E%3Crect x='9' y='4' width='4' height='5' fill='%2314131a'/%3E%3C/svg%3E">
 <style>
   :root {
     --bg: #14131a; --panel: #1c1b24; --panel-2: #23222d; --line: #302e3c;
@@ -27,6 +28,7 @@
   .bar { height: 6px; background: var(--panel-2); border-radius: 3px; margin-top: 4px; overflow: hidden; }
   .bar > i { display: block; height: 100%; background: var(--accent); }
   .pill { padding: 2px 8px; border-radius: 10px; background: var(--panel-2); color: var(--dim); font-size: 11px; }
+  .pill.offline { background: #3a2530; color: var(--danger); border: 1px solid #7c2d12; }
 
   .tabs { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
   .tabs button { background: var(--panel-2); border: 0; padding: 5px 14px; color: var(--dim); font-size: 12px; }
@@ -74,8 +76,8 @@
   .badge.rounds { background: #3a2530; color: var(--danger); }
   .badge.owner { background: #262a3d; color: #93b4f8; }
   .badge.q { color: #fb923c; }
-  .move { display: flex; gap: 4px; margin-top: 8px; }
-  .move button { flex: 1; background: #2b2937; border: 1px solid var(--line); border-radius: 6px;
+  .move { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+  .move button { flex: 1; min-width: 0; background: #2b2937; border: 1px solid var(--line); border-radius: 6px;
     padding: 3px 0; font-size: 10px; color: var(--dim); }
   .move button:hover { border-color: var(--accent); color: var(--text); }
   .move button.on { background: var(--accent); color: #14131a; border-color: var(--accent); font-weight: 700; }
@@ -85,6 +87,9 @@
   }
   select.assign:hover { border-color: var(--accent); }
   .empty { color: var(--dim); font-size: 11px; padding: 6px 2px; }
+  .blank { grid-column: 1 / -1; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 22px 18px; line-height: 1.6; }
+  .blank code { background: var(--panel-2); border-radius: 5px; padding: 1px 6px; color: var(--accent); }
   footer { color: var(--dim); font-size: 11px; padding: 8px 16px; }
 
   #officeView canvas {
@@ -94,6 +99,7 @@
   .hint { color: var(--dim); font-size: 11px; margin-top: 8px; line-height: 1.6; }
 
   #alerts { position: fixed; right: 14px; bottom: 14px; z-index: 50; display: flex;
+    max-height: 60vh; overflow-y: auto;
     flex-direction: column; gap: 6px; width: 290px; }
   .alert {
     background: linear-gradient(180deg, #2a1d16, #241a14);
@@ -109,7 +115,11 @@
   .alert.more { text-align: center; color: #fdba74; font-size: 11px; padding: 6px; }
   .alert.quiet { background: var(--panel); border-color: var(--line); border-left-color: var(--dim);
     color: var(--dim); font-size: 11px; text-align: center; padding: 6px; cursor: default; }
-  .alert .x { color: #fdba74; padding: 0 3px; cursor: pointer; }
+  .alert .x { color: #fdba74; background: none; border: 0; cursor: pointer; font-size: 15px;
+    min-width: 24px; min-height: 24px; line-height: 1; padding: 0; border-radius: 4px; }
+  .alert .x:hover, .alert .x:focus-visible { background: rgba(251,146,60,0.18); }
+  .alert:focus-visible, .proj:focus-visible, .move button:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 1px; }
   .alert .x:hover { color: #fff; }
   .alert-head {
     display: flex; justify-content: space-between; align-items: center; gap: 8px;
@@ -132,6 +142,30 @@
     border-radius: 8px; padding: 3px 6px; font-size: 11px;
   }
   select.lang:hover { border-color: var(--accent); color: var(--text); }
+
+  /* Dar ekran: sabit 260px kenar çubuğu tahtaya yer bırakmıyordu, dört kolon da
+     sığmıyordu. Tablet boyunda tek kolonlu yerleşim + iki kolonlu tahta,
+     telefonda tek kolonlu tahta. */
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; min-height: 0; }
+    aside { border-right: 0; border-bottom: 1px solid var(--line); }
+    section { padding: 12px; }
+    .cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .sess { min-width: 0; max-width: none; flex: 1 1 220px; }
+    /* dar kartta eşit genişlik uzun etiketi ("Fertig") taşırıyordu: buton
+       kadarınca yer kaplasın, sığmazsa alt satıra sarsın */
+    .move button { flex: 1 1 auto; padding: 3px 4px; }
+    /* Dar ekranda sabit panel kartların üstüne binip aşama düğmelerini tıklanamaz
+       kılıyordu; burada akışa girsin, tahtanın altında dursun. */
+    #alerts { position: static; right: auto; bottom: auto; width: auto;
+      max-height: none; margin: 0 12px 12px; }
+  }
+  @media (max-width: 480px) {
+    header { gap: 12px; padding: 8px 12px; }
+    .meter { min-width: 140px; }
+    .cols { grid-template-columns: minmax(0, 1fr); }
+    #alerts { right: 8px; left: 8px; width: auto; }
+  }
 </style>
 </head>
 <body>
@@ -143,7 +177,8 @@
   </div>
   <div class="meters" id="meters"></div>
   <div style="margin-left:auto; display:flex; gap:8px; align-items:center">
-    <select id="langSelect" class="lang" aria-label="language"></select>
+    <span class="pill offline" id="offline" hidden></span>
+    <select id="langSelect" class="lang"></select>
     <span class="pill" id="clock"></span>
   </div>
 </header>
@@ -159,7 +194,9 @@
       <div class="cols" id="cols"></div>
     </div>
     <div id="officeView" hidden>
-      <canvas id="officeCanvas"></canvas>
+      <canvas id="officeCanvas" role="img" aria-label="Pixel office: each character is an agent, each room shows what it is doing">
+        <p id="officeFallback"></p>
+      </canvas>
       <div class="hint" id="officeHint"></div>
     </div>
   </section>
