@@ -47,7 +47,7 @@ const STRINGS = {
     turnsIdle: (n) => `${n} chat${n === 1 ? '' : 's'} finished a turn — your move`,
     notifyTitle: (project) => `${project} — you were asked a question`,
     ago: 'ago',
-    footer: (projects, agents) => `${projects} projects · ${agents} agents running · reading ~/.claude (read-only)`,
+    footer: (projects, agents) => `${projects} project${projects === 1 ? '' : 's'} · ${agents} agent${agents === 1 ? '' : 's'} running · reading ~/.claude (read-only)`,
     roomPm: 'PM OFFICE',
     roomWork: 'WORK ROOM',
     roomTest: 'TEST ROOM',

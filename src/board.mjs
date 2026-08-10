@@ -10,12 +10,15 @@ export const STAGES = ['manager', 'dev', 'test', 'done'];
 // Anahtar biçimi sabit: "<sessionId>:<taskId>". Serbest anahtar kabul etmek
 // __proto__ gibi değerlerin prototip zincirine yazılmasına yol açıyordu.
 const KEY_PATTERN = /^[A-Za-z0-9._-]{1,128}:[A-Za-z0-9._-]{1,32}$/;
+// Yalnızca diskten okurken anlamlı: elle düzenlenmiş bir overlay.json bu adları taşıyabilir.
+// assertKey'de gereksizdi — KEY_PATTERN zaten ":" zorunlu kıldığı için hiçbir anahtar
+// tam olarak "__proto__" olamaz.
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 export class ValidationError extends Error {}
 
 export function assertKey(key) {
-  if (typeof key !== 'string' || !KEY_PATTERN.test(key) || FORBIDDEN_KEYS.has(key)) {
+  if (typeof key !== 'string' || !KEY_PATTERN.test(key)) {
     throw new ValidationError('key must look like "<sessionId>:<taskId>"');
   }
   return key;

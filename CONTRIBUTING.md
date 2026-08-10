@@ -33,8 +33,11 @@ It is also the whole test suite today, which is an honest way of saying there is
 | `src/sources.mjs` | Everything that reads `~/.claude`. The only file that knows Claude Code's on-disk format |
 | `src/events.mjs` | The handoff log and the rules that derive rooms from it |
 | `src/board.mjs` | Stage/owner overlay persistence |
-| `public/index.html` | UI shell, project sidebar, board, alerts |
+| `public/index.html` | Markup shell and stylesheet |
+| `public/app.js` | Sidebar, board, alerts, polling — everything the page does |
 | `public/office.js` | Canvas renderer for the pixel office |
+| `public/i18n.js` | Six languages; every key exists in all of them |
+| `demo/seed.mjs` | Fabricated `~/.claude` tree for `crewdesk demo` |
 
 If you want to support another agent CLI, `src/sources.mjs` is the file to change; nothing else should need to know where the data came from.
 

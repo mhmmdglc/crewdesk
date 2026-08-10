@@ -516,14 +516,21 @@ export class Office {
       }
       this.drawPerson(p, walking);
 
+      // Rozetler karakterin üstüne çıkar; oda isim levhası da odanın üst şeridinde.
+      // Üstte yer yoksa rozetleri karakterin altına al, çakışmasınlar.
+      const band = this.roomRect(p.room).y + 22 * PX;
+      const above = p.y - 38 * PX >= band;
+      const near = above ? p.y - 26 * PX : p.y + 46 * PX;
+      const far = above ? p.y - 38 * PX : p.y + 58 * PX;
+
       if (p.currentTask && !walking) {
-        this.tag(p.x + 8 * PX, p.y - 26 * PX, `#${p.currentTask.id}`, 'rgba(14,13,20,0.92)', '#e8e6f0');
+        this.tag(p.x + 8 * PX, near, `#${p.currentTask.id}`, 'rgba(14,13,20,0.92)', '#e8e6f0');
       }
       if (p.tool && p.active) {
-        this.tag(p.x + 8 * PX, p.y - 38 * PX, p.tool.slice(0, 22), 'rgba(14,13,20,0.92)', '#4ade80');
+        this.tag(p.x + 8 * PX, far, p.tool.slice(0, 22), 'rgba(14,13,20,0.92)', '#4ade80');
       }
       if (p.waiting) {
-        this.tag(p.x + 8 * PX, p.y - 26 * PX, t('hasQuestion'), '#7c2d12', '#fed7aa');
+        this.tag(p.x + 8 * PX, near, t('hasQuestion'), '#7c2d12', '#fed7aa');
       }
 
       ctx.font = `${7 * PX}px ui-monospace, Menlo, monospace`;

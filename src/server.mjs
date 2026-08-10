@@ -35,6 +35,17 @@ function sameOrigin(req, host) {
 }
 
 // Host başlığından port'u ayırır; IPv6 köşeli parantezli biçimi de tanır
+// Hata yanıtları da tip ve güvenlik başlığı taşısın: sniff edilecek bir gövde bırakma
+function plain(res, code, body) {
+  res.writeHead(code, {
+    'content-type': 'text/plain; charset=utf-8',
+    'x-content-type-options': 'nosniff',
+    'referrer-policy': 'no-referrer',
+    'content-security-policy': "default-src 'none'; frame-ancestors 'none'",
+  });
+  res.end(body);
+}
+
 function hostName(host) {
   if (host.startsWith('[')) {
     const end = host.indexOf(']');
@@ -55,6 +66,9 @@ function hostAllowed(req, address, port) {
   const host = (req.headers.host || '').toLowerCase();
   if (!host) return false;
   const name = hostName(host);
+  // Port da bizim dinlediğimiz port olmalı; yoksa varsayılan 80/443 kastedilmiştir
+  const declared = host.slice(name.length).startsWith(':') ? host.slice(name.length + 1) : '';
+  if (declared !== String(port) && !(declared === '' && (port === 80 || port === 443))) return false;
   // Joker bind'de (0.0.0.0 / ::) hangi arayüzden gelineceğini bilemeyiz; tarayıcı
   // Host olarak makinenin LAN IP'sini gönderir. Bu yüzden Host'un IP-literal (ya da
   // localhost) olması yeterli sayılır — rastgele bir DNS adı hâlâ reddedilir,
@@ -179,7 +193,7 @@ async function serveStatic(res, urlPath) {
   const rel = urlPath === '/' ? 'index.html' : urlPath.replace(/^\/+/, '');
   const file = path.resolve(PUBLIC_DIR, rel);
   if (file !== PUBLIC_DIR && !file.startsWith(PUBLIC_DIR + path.sep)) {
-    res.writeHead(403).end('forbidden');
+    plain(res, 403, 'forbidden');
     return;
   }
   try {
@@ -195,7 +209,7 @@ async function serveStatic(res, urlPath) {
     });
     res.end(data);
   } catch {
-    res.writeHead(404).end('not found');
+    plain(res, 404, 'not found');
   }
 }
 
@@ -271,7 +285,7 @@ export function createServer({ address = '127.0.0.1', port = 4600 } = {}) {
 
       if (readMethod === 'GET') return await serveStatic(res, url.pathname);
 
-      res.writeHead(405).end('method not allowed');
+      plain(res, 405, 'method not allowed');
     } catch (error) {
       if (error instanceof ValidationError) return json(res, 400, { error: error.message });
       if (error instanceof PayloadTooLargeError) return json(res, 413, { error: error.message });

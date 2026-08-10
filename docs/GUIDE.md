@@ -105,6 +105,8 @@ It separates two things that look identical in a transcript:
 
 Only questions from chats touched in the last two hours are raised; an eight-hour-old chat is not waiting for you, it has just stopped.
 
+Two windows are at work and they are not the same. The alert panel uses two hours, because a question older than that has usually been overtaken. The office and the sidebar use eight hours, because an agent that worked this morning still belongs on the floor even if it has gone quiet.
+
 Dismiss one with `×`, clear the lot with **mark all read**, or collapse the stack to a bell. Read marks are keyed to the chat's last message, so a *new* question from the same chat alerts again.
 
 Detection is heuristic. False positives happen; dismiss them. Hooking Claude Code's `Notification` event will make it exact and is on the roadmap.

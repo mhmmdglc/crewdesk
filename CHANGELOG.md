@@ -2,7 +2,7 @@
 
 All notable changes to crewdesk are recorded here.
 
-## [0.1.0] — unreleased
+## [0.1.0] — 2026-08-10
 
 First public release.
 

@@ -317,7 +317,12 @@ function frontField(block, key) {
 
 // Her projenin kendi ajan kadrosu vardır: <proje>/.claude/agents/*.md
 export async function readAgentRoster(projectPath) {
-  const dir = path.join(projectPath, '.claude', 'agents');
+  // projectPath transkriptteki serbest "cwd" alanından gelir. Doğrulanmazsa HOME dışındaki
+  // bir dizinin .claude/agents/*.md dosyaları okunup /api/state'te yayınlanabiliyordu.
+  const resolved = path.resolve(String(projectPath || ''));
+  const home = path.resolve(os.homedir());
+  if (resolved !== home && !resolved.startsWith(home + path.sep)) return [];
+  const dir = path.join(resolved, '.claude', 'agents');
   const files = await fsp.readdir(dir).catch(() => []);
   const roster = [];
 

@@ -151,7 +151,7 @@ if (options.demo) {
   // 0.1.0 öncesi veri dizininden taşı
   const legacy = path.join(os.homedir(), '.agent-board');
   const current = path.join(os.homedir(), '.crewdesk');
-  if (fs.existsSync(legacy) && !fs.existsSync(current)) {
+  if (fs.statSync(legacy, { throwIfNoEntry: false })?.isDirectory() && !fs.existsSync(current)) {
     try {
       fs.renameSync(legacy, current);
       console.log(`crewdesk: moved existing data ${legacy} → ${current}`);

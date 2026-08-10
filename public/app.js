@@ -181,6 +181,9 @@ function renderAlerts() {
     box.innerHTML = `<button class="bell" id="alertsShow">🔔 ${esc(asks.length ? t('questions', asks.length) : t('turnsDone', idle))}</button>`;
     document.getElementById('alertsShow').onclick = () => {
       alertsHidden = false;
+      if (window.Notification && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+      }
       localStorage.removeItem(HIDE_KEY);
       alertSignature = '';
       renderAlerts();
@@ -363,9 +366,7 @@ applyStaticStrings();
 document.getElementById('tabBoard').onclick = () => setView('board');
 document.getElementById('tabOffice').onclick = () => setView('office');
 
-if (window.Notification && Notification.permission === 'default') {
-  Notification.requestPermission().catch(() => {});
-}
+// İzin, kullanıcı uyarı panelini kendi açtığında istenir — sayfa açılır açılmaz değil.
 
 load();
 setInterval(() => load(true), 4000);
