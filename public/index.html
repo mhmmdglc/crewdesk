@@ -99,6 +99,7 @@
   .hint { color: var(--dim); font-size: 11px; margin-top: 8px; line-height: 1.6; }
 
   #alerts { position: fixed; right: 14px; bottom: 14px; z-index: 50; display: flex;
+    max-height: 60vh; overflow-y: auto;
     flex-direction: column; gap: 6px; width: 290px; }
   .alert {
     background: linear-gradient(180deg, #2a1d16, #241a14);
@@ -154,6 +155,10 @@
     /* dar kartta eşit genişlik uzun etiketi ("Fertig") taşırıyordu: buton
        kadarınca yer kaplasın, sığmazsa alt satıra sarsın */
     .move button { flex: 1 1 auto; padding: 3px 4px; }
+    /* Dar ekranda sabit panel kartların üstüne binip aşama düğmelerini tıklanamaz
+       kılıyordu; burada akışa girsin, tahtanın altında dursun. */
+    #alerts { position: static; right: auto; bottom: auto; width: auto;
+      max-height: none; margin: 0 12px 12px; }
   }
   @media (max-width: 480px) {
     header { gap: 12px; padding: 8px 12px; }

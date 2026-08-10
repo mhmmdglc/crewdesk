@@ -280,6 +280,17 @@ function render() {
     </div>`;
   }
   office.update(project);
+  // Ofis sekmesi de aynı şeyi söylesin: proje yokken boş bir kat planı tek başına
+  // hiçbir şey anlatmıyor. Canvas'ın metin alternatifi de buradan besleniyor.
+  const officeHint = document.getElementById('officeHint');
+  const fallback = document.getElementById('officeFallback');
+  if (!project) {
+    officeHint.innerHTML = `${esc(t('noProjects'))} <code>crewdesk demo</code>`;
+    if (fallback) fallback.textContent = t('noProjects');
+  } else {
+    officeHint.innerHTML = t('officeHint');
+    if (fallback) fallback.textContent = t('officeHint').replace(/<[^>]+>/g, '');
+  }
   renderOffline();
   const totalActive = state.projects.reduce((n, p) => n + p.activeCount, 0);
   document.getElementById('footer').textContent = t('footer', state.projects.length, totalActive);
@@ -312,8 +323,12 @@ function renderOffline() {
 // eyleminden gelen load() çağrıları (auto=false) hep hemen çizer.
 function interacting() {
   const el = document.activeElement;
-  if (!el || (el.tagName !== 'SELECT' && el.tagName !== 'BUTTON')) return false;
-  return Boolean(el.closest('main'));
+  if (!el || el === document.body) return false;
+  const focusable = el.tagName === 'SELECT' || el.tagName === 'BUTTON' || el.hasAttribute('tabindex');
+  if (!focusable) return false;
+  // Uyarı paneli main'in dışında, body'nin çocuğu; orada da odak kaybolmasın
+  // yoksa kapatma düğmesine basılan Enter boşa gidiyor.
+  return Boolean(el.closest('main') || el.closest('#alerts'));
 }
 
 async function load(auto = false) {
