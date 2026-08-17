@@ -23,11 +23,15 @@ Sunucuyu yeniden başlatmadan `src/` değişikliği etkili olmaz; `public/` içi
 | `public/app.js` | Arayüz mantığı, uyarılar |
 | `public/office.js` | Canvas pixel ofis |
 | `public/i18n.js` | 6 dil (en varsayılan) |
+| `src/nudge.mjs` | Dürtme kuyruğu — `~/.crewdesk/nudges/` altına yazar, bekleyenleri okur |
+| `hooks/crewdesk-nudge.mjs` | Claude Code Stop kancası: dürtmeyi tüketip oturuma verir |
 | `demo/seed.mjs` | Uydurma `~/.claude` ağacı; `seed({ refresh: true })` zaman damgalarını tazeler, `.crewdesk-demo` işaretçisi olmayan dizini silmez |
 
 ## Bozulmaması gereken kurallar
 
-1. **`~/.claude`'a asla yazma.** Kendi durumumuz `~/.crewdesk/` altında.
+1. **`~/.claude`'a asla yazma.** Kendi durumumuz `~/.crewdesk/` altında. Tek istisna
+   `crewdesk install-hook`: kullanıcının kendi yazdığı, onay soran, kancayı `settings.json`'a
+   ekleyen komut. Sunucu ve arayüz bu dizine hiçbir koşulda yazmaz.
 2. **Sakla değil, türet.** Oda, kuyruk, test turu — hepsi `events.jsonl`'den hesaplanır. Elle senkron tutulan alan ekleme.
 3. **Ekran gerçeği söylesin.** Koşmayan ajan çalışma odasına girmez. Gözlemlemediğin aktiviteyi çizme.
 4. **Runtime bağımlılığı yok.** `dependencies` boş kalacak.

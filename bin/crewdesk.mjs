@@ -18,7 +18,7 @@ const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]', '0:0:0:0:0:0
 
 const HELP = `crewdesk — a local dashboard for Claude Code
 
-Usage: crewdesk [demo] [options]
+Usage: crewdesk [demo|install-hook] [options]
 
 Options:
   --port, -p <number>   Port to listen on (default: 4600)
@@ -29,6 +29,12 @@ Options:
                         to everyone on the network
   --demo, -d            Serve fabricated data instead of your own
   --help, -h            Show this help
+
+Commands:
+  install-hook          Print the Stop hook that delivers nudges, and offer to
+                        add it to ~/.claude/settings.json. This is the one
+                        thing crewdesk ever writes outside ~/.crewdesk/, it
+                        asks first, and it never runs on its own.
 
 Run "crewdesk demo" to serve fabricated data instead of your own.
 
@@ -53,7 +59,7 @@ function parsePort(raw, flagName) {
 // Eskiden args.includes('demo') tam eşleşme aradığı için "--demo" gerçek veriyi,
 // "--prot 4700" da sessizce varsayılan portu açıyordu.
 function parseArgs(argv) {
-  const options = { demo: false, help: false, port: 4600, host: '127.0.0.1' };
+  const options = { demo: false, help: false, installHook: false, port: 4600, host: '127.0.0.1' };
 
   const valueFor = (flagName, index) => {
     const value = argv[index];
@@ -67,6 +73,8 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg === 'demo' || arg === '--demo' || arg === '-d') {
       options.demo = true;
+    } else if (arg === 'install-hook') {
+      options.installHook = true;
     } else if (arg === '--help' || arg === '-h') {
       options.help = true;
     } else if (arg === '--port' || arg === '-p') {
@@ -122,6 +130,72 @@ const options = parseArgs(args);
 
 if (options.help) {
   console.log(HELP);
+  process.exit(0);
+}
+
+// Dürtmeyi oturuma taşıyan Stop kancasını kurar. crewdesk'in ~/.crewdesk dışına
+// yazdığı TEK yer burası: kullanıcı bu komutu kendi yazar ve onay verir.
+if (options.installHook) {
+  const hookPath = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'hooks', 'crewdesk-nudge.mjs');
+  const hook = { type: 'command', command: `node ${JSON.stringify(path.resolve(hookPath))}`, timeout: 10 };
+  const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
+
+  console.log(`crewdesk nudges are delivered by a Claude Code Stop hook.
+
+crewdesk itself only ever writes to ~/.crewdesk/nudges/. The hook below runs
+inside your own Claude Code, reads a waiting nudge for that session, and hands
+it to Claude instead of letting the turn end.
+
+This is what would be added to ${settingsPath}:
+
+${JSON.stringify({ hooks: { Stop: [{ matcher: '', hooks: [hook] }] } }, null, 2)}
+`);
+
+  let current = null;
+  try {
+    current = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  } catch {
+    current = null;
+  }
+  const already = JSON.stringify(current?.hooks?.Stop || []).includes('crewdesk-nudge');
+  if (already) {
+    console.log('Already installed — nothing to do.');
+    process.exit(0);
+  }
+  if (!process.stdin.isTTY) {
+    console.log('Not a terminal, so nothing was written. Paste the block above into that file,');
+    console.log('or run "crewdesk install-hook" from a terminal to have it added for you.');
+    process.exit(0);
+  }
+
+  process.stdout.write(`Add it to ${settingsPath}? [y/N] `);
+  const answer = await new Promise((resolve) => {
+    process.stdin.setEncoding('utf8');
+    process.stdin.once('data', (chunk) => resolve(String(chunk).trim().toLowerCase()));
+  });
+  if (answer !== 'y' && answer !== 'yes') {
+    console.log('Nothing written.');
+    process.exit(0);
+  }
+
+  const next = current && typeof current === 'object' ? current : {};
+  next.hooks = next.hooks && typeof next.hooks === 'object' ? next.hooks : {};
+  const stop = Array.isArray(next.hooks.Stop) ? next.hooks.Stop : [];
+  stop.push({ matcher: '', hooks: [hook] });
+  next.hooks.Stop = stop;
+
+  // Var olan ayarları kaybetmemek için önce yedek, sonra atomik değiştirme
+  try {
+    fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+    if (current) fs.copyFileSync(settingsPath, `${settingsPath}.crewdesk-backup`);
+    const tmp = `${settingsPath}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`);
+    fs.renameSync(tmp, settingsPath);
+  } catch (error) {
+    fail(`could not write ${settingsPath} — ${error.code || error.message}`);
+  }
+  console.log(`Installed.${current ? ` Previous file kept at ${settingsPath}.crewdesk-backup.` : ''}`);
+  console.log('Restart any Claude Code session that is already running for it to pick this up.');
   process.exit(0);
 }
 

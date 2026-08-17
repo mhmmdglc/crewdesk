@@ -94,6 +94,40 @@ When Claude Code publishes official limit gauges (`official-usage.json`), they r
 
 The 5-hour window is a sum over the last five hourly buckets, so immediately after the hour turns it covers a little over four hours of real time.
 
+## Nudging a session
+
+A session card carries a question box. Type something, press **nudge**, and it is queued for
+that session.
+
+crewdesk cannot reach into a running session. A Claude Code session is a separate process
+whose input belongs to whatever started it; there is no channel a dashboard can use. So the
+nudge takes a longer road:
+
+1. crewdesk writes `~/.crewdesk/nudges/<sessionId>.json`. That is all it does, and it stays
+   inside its own directory.
+2. A Stop hook inside your Claude Code runs when that session is about to end its turn.
+3. The hook finds the waiting nudge, deletes it, and returns it as the reason to keep going.
+   Claude reads your question and answers instead of stopping.
+
+Install the hook once:
+
+```bash
+crewdesk install-hook
+```
+
+It prints the exact JSON it would add to `~/.claude/settings.json`, asks before writing, and
+keeps a backup of the previous file. Running it again does nothing. This command is the only
+thing in crewdesk that ever writes outside `~/.crewdesk/`, and it never runs on its own.
+
+**What this can and cannot do.** A nudge lands at the session's next stop, which is exactly
+the moment an agent would have gone quiet on you — so a session that is working now will pick
+it up shortly. A session that stopped an hour ago will not: nothing will fire its Stop hook
+until it runs again, and the card says the nudge is waiting rather than pretending it arrived.
+A nudge older than six hours is dropped instead of surfacing out of nowhere.
+
+The card shows a waiting nudge until the hook consumes it; the file's existence *is* the
+state, so there is nothing to keep in sync. Withdraw one with **cancel**.
+
 ## Question alerts
 
 When a chat is waiting on you, crewdesk raises a card in the corner and, if you allow it, a desktop notification.
@@ -183,6 +217,8 @@ GET  /api/events    # the raw handoff log
 GET  /api/health
 POST /api/stage     # { "key": "<sessionId>:<taskId>", "stage": "manager|dev|test|done" }
 POST /api/assign    # { "key": "...", "agent": "qa-tester", "event": "assigned" }
+POST /api/nudge     # { "sessionId": "...", "text": "what are you doing?" }
+                    # { "sessionId": "...", "cancel": true } withdraws a waiting nudge
 ```
 
 Assign a task from a script or a hook:

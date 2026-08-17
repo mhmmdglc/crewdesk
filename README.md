@@ -44,6 +44,11 @@ That serves invented projects from a throwaway directory and never reads your re
 
 **Office** — the same thing as a room you can glance at. Each character is an agent, and the room it stands in is what it is doing *right now*: working, testing, waiting on you, or idle in the lounge with its queue on its shoulder.
 
+**Nudge** — a session card has a question box. Ask a session what it is doing, and if it is
+stuck, tell it to carry on. crewdesk does not reach into a running session; it queues the
+nudge and a Claude Code Stop hook delivers it when that session would otherwise stop. Set it
+up once with `crewdesk install-hook`.
+
 **Top bar** — rolling 5-hour and 7-day token consumption.
 
 <img src="https://raw.githubusercontent.com/mhmmdglc/crewdesk/main/docs/board.png" alt="crewdesk board: projects sidebar, Manager/Dev/Test/Done columns, token windows and a question alert" width="100%">

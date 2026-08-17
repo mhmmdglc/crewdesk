@@ -84,7 +84,47 @@ function renderSessions(project) {
       ${s.lastTool ? `<div class="tool">▸ ${esc(s.lastTool)}</div>` : ''}
       <div class="meta">${esc(s.gitBranch || '—')} · ${ago(s.lastActivity)} ${t('ago')} · ${fmt(s.tokensFiveHour)} ${t('tokens')}/5h</div>
       ${s.subagents.map((a) => `<div class="sub">└ ${esc(a.name)}${a.lastTool ? ` · ${esc(a.lastTool)}` : ''}</div>`).join('')}
+      <div class="nudge">
+        ${s.pendingNudge
+          ? `<span class="pending" title="${esc(s.pendingNudge.text)}">${esc(t('nudgePending'))}</span>
+             <button class="nudge-cancel" data-session="${esc(s.sessionId)}">${esc(t('nudgeCancel'))}</button>`
+          : `<input class="nudge-text" data-session="${esc(s.sessionId)}"
+               aria-label="${esc(t('nudgeLabel'))}" placeholder="${esc(t('nudgePlaceholder'))}">
+             <button class="nudge-send" data-session="${esc(s.sessionId)}">${esc(t('nudgeSend'))}</button>`}
+      </div>
     </div>`).join('') || `<div class="empty">${t('noSessions')}</div>`;
+
+  document.querySelectorAll('.nudge-send').forEach((el) => {
+    el.onclick = () => {
+      const input = document.querySelector(`.nudge-text[data-session="${CSS.escape(el.dataset.session)}"]`);
+      sendNudge(el.dataset.session, (input?.value || '').trim() || t('nudgeDefault'));
+    };
+  });
+  document.querySelectorAll('.nudge-text').forEach((el) => {
+    el.onkeydown = (event) => {
+      if (event.key !== 'Enter') return;
+      sendNudge(el.dataset.session, el.value.trim() || t('nudgeDefault'));
+    };
+  });
+  document.querySelectorAll('.nudge-cancel').forEach((el) => {
+    el.onclick = () => sendNudge(el.dataset.session, null, true);
+  });
+}
+
+// Dürtme oturuma doğrudan gitmez: ~/.crewdesk/nudges/ altına yazılır ve Claude
+// Code'un Stop kancası onu oturum duracakken teslim eder.
+async function sendNudge(sessionId, text, cancel = false) {
+  try {
+    const res = await fetch('/api/nudge', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(cancel ? { sessionId, cancel: true } : { sessionId, text }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch {
+    /* çevrimdışı göstergesi zaten load() üzerinden çıkar */
+  }
+  await load();
 }
 
 function renderColumns(project) {
@@ -324,7 +364,10 @@ function renderOffline() {
 function interacting() {
   const el = document.activeElement;
   if (!el || el === document.body) return false;
-  const focusable = el.tagName === 'SELECT' || el.tagName === 'BUTTON' || el.hasAttribute('tabindex');
+  // INPUT/TEXTAREA da sayılmalı: dürtme kutusuna yazarken tazeleme devreye girince
+  // yazılan metin siliniyor ve dürtme varsayılan soruyla gidiyordu.
+  const focusable = el.tagName === 'SELECT' || el.tagName === 'BUTTON'
+    || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.hasAttribute('tabindex');
   if (!focusable) return false;
   // Uyarı paneli main'in dışında, body'nin çocuğu; orada da odak kaybolmasın
   // yoksa kapatma düğmesine basılan Enter boşa gidiyor.

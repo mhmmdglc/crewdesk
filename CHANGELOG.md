@@ -2,6 +2,22 @@
 
 All notable changes to crewdesk are recorded here.
 
+## [Unreleased]
+
+### Added
+
+- **Nudging a session.** A session card now carries a question box: type something, press
+  nudge, and it is queued for that session. crewdesk does not send it — it writes the nudge
+  to `~/.crewdesk/nudges/`, and a Claude Code Stop hook hands it to Claude instead of letting
+  the turn end. So a session that would have gone quiet carries on instead.
+
+  Install the hook with `crewdesk install-hook`. It prints what it will add, asks before
+  touching `~/.claude/settings.json`, keeps a backup, and is the only thing crewdesk ever
+  writes outside its own directory.
+
+  A nudge reaches a session at its next stop. A session that has already stopped will not
+  pick one up until it runs again — the card says so rather than implying otherwise.
+
 ## [0.1.0] — 2026-08-10
 
 First public release.

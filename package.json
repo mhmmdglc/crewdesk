@@ -12,6 +12,7 @@
     "src/",
     "public/",
     "demo/",
+    "hooks/",
     "README.md",
     "LICENSE",
     "LICENSE-THIRD-PARTY.md"

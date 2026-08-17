@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { scanProjects, readTasks, readTokenWindows, readAgentRoster } from './sources.mjs';
 import { decorate, setStage, setOwner, assertKey, ValidationError, STAGES } from './board.mjs';
 import { readEvents, appendEvent, deriveCrew, ROOMS, EVENTS } from './events.mjs';
+import { writeNudge, readPendingNudges, cancelNudge, assertSessionId, NudgeError } from './nudge.mjs';
 
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const MAX_BODY = 256 * 1024;
@@ -84,6 +85,7 @@ async function buildState() {
   const projects = await scanProjects();
   const tokens = readTokenWindows();
   const events = await readEvents();
+  const nudges = await readPendingNudges();
 
   const enriched = [];
   for (const project of projects) {
@@ -115,6 +117,10 @@ async function buildState() {
       sessions: project.sessions.map((s) => ({
         ...s,
         tokensFiveHour: tokens.perSessionFiveHour[s.sessionId] || 0,
+        // Dosya duruyorsa kanca henüz tüketmemiş demektir: dürtme yolda.
+        pendingNudge: Object.prototype.hasOwnProperty.call(nudges, s.sessionId)
+          ? nudges[s.sessionId]
+          : null,
       })),
       tasks: decorated,
       stageCounts: STAGES.reduce((acc, stage) => {
@@ -246,6 +252,19 @@ export function createServer({ address = '127.0.0.1', port = 4600 } = {}) {
           return json(res, 415, { error: 'content-type must be application/json' });
         }
 
+        // Dürtme: crewdesk yalnızca ~/.crewdesk/nudges/ altına yazar. Oturuma
+        // taşıyan şey Claude Code'un Stop kancası (hooks/crewdesk-nudge.mjs).
+        if (url.pathname === '/api/nudge') {
+          const body = await readBody(req);
+          assertSessionId(body.sessionId);
+          if (body.cancel) {
+            await cancelNudge(body.sessionId);
+            return json(res, 200, { ok: true, pendingNudge: null });
+          }
+          const entry = await writeNudge(body.sessionId, body.text);
+          return json(res, 200, { ok: true, pendingNudge: entry });
+        }
+
         if (url.pathname === '/api/stage') {
           const body = await readBody(req);
           assertKey(body.key);
@@ -288,6 +307,7 @@ export function createServer({ address = '127.0.0.1', port = 4600 } = {}) {
       plain(res, 405, 'method not allowed');
     } catch (error) {
       if (error instanceof ValidationError) return json(res, 400, { error: error.message });
+      if (error instanceof NudgeError) return json(res, 400, { error: error.message });
       if (error instanceof PayloadTooLargeError) return json(res, 413, { error: error.message });
       // İstemciye iç detay sızmasın, ama 500'ün sebebi sunucu tarafında görünsün
       console.error(`crewdesk: ${req.method} ${url.pathname} failed`, error);
